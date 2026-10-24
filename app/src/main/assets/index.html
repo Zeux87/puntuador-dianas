@@ -394,29 +394,47 @@ function findBlack(P){
   return best;
 }
 
-// Interpolación lineal por tramos (con extrapolación por el último tramo)
-function mapF(xs, ys, v){
+/* ---------- Mapa radial por ángulo: corrige perspectiva y distorsión de la foto ----------
+   Para cada grado alrededor del centro se guarda a qué radio "nominal" (según la elipse del negro)
+   cae cada línea impresa de anillo. Con eso, un punto se puntúa interpolando entre las líneas
+   reales de su propio ángulo, aunque la diana esté inclinada o el papel no esté plano. */
+const NANG = 180;
+
+function pw(xs, ys, v){
   const n = xs.length;
   if (v <= xs[0]) return ys[0] + (v - xs[0]) * (ys[1] - ys[0]) / (xs[1] - xs[0]);
   for (let i = 1; i < n; i++) if (v <= xs[i]) return ys[i - 1] + (v - xs[i - 1]) * (ys[i] - ys[i - 1]) / (xs[i] - xs[i - 1]);
   return ys[n - 1] + (v - xs[n - 1]) * (ys[n - 1] - ys[n - 2]) / (xs[n - 1] - xs[n - 2]);
 }
-// Radio "nominal" (según la elipse del negro) que corresponde a un radio real en mm
-function nomR(cal, r){ return cal && cal.map ? mapF(cal.map.tru, cal.map.nom, r) : r; }
+function angInterp(arr, t){
+  let f = t / (2 * Math.PI) * NANG; f = ((f % NANG) + NANG) % NANG;
+  const i = Math.floor(f) % NANG, k = f - Math.floor(f), j = (i + 1) % NANG;
+  return arr[i] * (1 - k) + arr[j] * k;
+}
+function knotsAt(m, t){ return m.nom.map(a => angInterp(a, t)); }
+// t = ángulo en el sistema nominal con el eje y hacia abajo (como la imagen)
+function trueFromNom(cal, rn, t){ const m = cal && cal.rmap; return m ? pw(knotsAt(m, t), m.tru, rn) : rn; }
+function nomFromTrue(cal, rt, t){ const m = cal && cal.rmap; return m ? pw(m.tru, knotsAt(m, t), rt) : rt; }
 
-function toMM(cal, R, px, py){
+// Píxel a mm nominales (y hacia abajo)
+function toNom(cal, R, px, py){
   const c = Math.cos(cal.theta), s = Math.sin(cal.theta);
   const vx = px - cal.cx, vy = py - cal.cy;
   const x1 = vx * c + vy * s, y1 = -vx * s + vy * c;
   const x2 = x1 * R / cal.a, y2 = y1 * R / cal.b;
-  let x3 = x2 * c - y2 * s, y3 = x2 * s + y2 * c;
-  if (cal.map){
-    const rn = Math.hypot(x3, y3);
-    if (rn > 1e-6){ const k = mapF(cal.map.nom, cal.map.tru, rn) / rn; x3 *= k; y3 *= k; }
-  }
-  return { x: x3, y: -y3 };
+  return { x: x2 * c - y2 * s, y: x2 * s + y2 * c };
 }
-// Punto en mm nominales (y hacia abajo, como la imagen) a píxeles
+// Píxel a mm reales de la diana (y hacia arriba)
+function toMM(cal, R, px, py){
+  const n = toNom(cal, R, px, py);
+  let x = n.x, y = n.y;
+  if (cal.rmap){
+    const rn = Math.hypot(x, y);
+    if (rn > 1e-6){ const k = trueFromNom(cal, rn, Math.atan2(y, x)) / rn; x *= k; y *= k; }
+  }
+  return { x, y: -y };
+}
+// mm nominales (y hacia abajo) a píxeles
 function nomToPx(cal, R, mx, my){
   const c = Math.cos(cal.theta), s = Math.sin(cal.theta);
   const x2 = mx * c + my * s, y2 = -mx * s + my * c;
@@ -430,14 +448,47 @@ function sampleGray(P, x, y){
   return (g[i] * (1 - fx) + g[i + 1] * fx) * (1 - fy) + (g[i + w] * (1 - fx) + g[i + w + 1] * fx) * fy;
 }
 
-// Busca las líneas impresas de los anillos y construye la escala radial real.
-// Corrige la distorsión de la foto (papel no plano, lente) que una sola escala no puede absorber.
-function refineRings(P, cal, d){
-  const R = d.negro, sPx = (cal.a + cal.b) / 2 / R;
-  const step = Math.min(0.1, 0.5 / sPx);
-  const rMax = outerR(d) * 1.2 + 2;
-  const J = Math.floor(rMax / step) + 1, A = 240;
-  const pol = new Float32Array(A * J);
+// Bases para el ajuste: armónicos hasta orden 2, o la forma del borde escalada más un desplazamiento
+const harm5 = i => { const t = i / NANG * 2 * Math.PI; return [1, Math.cos(t), Math.sin(t), Math.cos(2 * t), Math.sin(2 * t)]; };
+const scaledEdge = (edge, k) => i => { const t = i / NANG * 2 * Math.PI; return [edge[i] * k, Math.cos(t), Math.sin(t)]; };
+
+// Ajuste robusto por mínimos cuadrados, descartando valores atípicos (números, agujeros, letras)
+function fitF(vals, basis = harm5){
+  const A = vals.length, nb = basis(0).length;
+  let use = [];
+  for (let i = 0; i < A; i++) if (!isNaN(vals[i])) use.push(i);
+  if (use.length < A * 0.3) return null;
+  const evalB = (c, b) => { let v = 0; for (let r = 0; r < nb; r++) v += c[r] * b[r]; return v; };
+  let c = null;
+  for (let it = 0; it < 4; it++){
+    const M = Array.from({ length: nb }, () => new Float64Array(nb + 1));
+    for (const i of use){
+      const b = basis(i);
+      for (let r = 0; r < nb; r++){ for (let q = 0; q < nb; q++) M[r][q] += b[r] * b[q]; M[r][nb] += b[r] * vals[i]; }
+    }
+    for (let p = 0; p < nb; p++){
+      let piv = p; for (let r = p + 1; r < nb; r++) if (Math.abs(M[r][p]) > Math.abs(M[piv][p])) piv = r;
+      [M[p], M[piv]] = [M[piv], M[p]];
+      if (Math.abs(M[p][p]) < 1e-12) return null;
+      for (let r = 0; r < nb; r++) if (r !== p){ const f = M[r][p] / M[p][p]; for (let q = p; q <= nb; q++) M[r][q] -= f * M[p][q]; }
+    }
+    c = M.map((row, p) => row[nb] / row[p]);
+    const res = use.map(i => Math.abs(vals[i] - evalB(c, basis(i))));
+    const sorted = res.slice().sort((p, q) => p - q), mad = sorted[sorted.length >> 1];
+    const thr = Math.max(3 * 1.4826 * mad, 0.15);
+    const keep = use.filter((_, k) => res[k] <= thr);
+    if (keep.length === use.length) break;
+    if (keep.length < A * 0.25) return null;
+    use = keep;
+  }
+  const v = new Float64Array(A);
+  for (let i = 0; i < A; i++) v[i] = evalB(c, basis(i));
+  return { v, c, n: use.length };
+}
+
+// Desenrolla la diana en coordenadas polares y calcula el contraste de línea en cada punto
+function polarDiff(P, cal, d, step, J){
+  const R = d.negro, A = NANG, pol = new Float32Array(A * J);
   for (let i = 0; i < A; i++){
     const t = i / A * 2 * Math.PI, ct = Math.cos(t), st = Math.sin(t);
     for (let j = 0; j < J; j++){
@@ -445,7 +496,6 @@ function refineRings(P, cal, d){
       pol[i * J + j] = sampleGray(P, p.x, p.y);
     }
   }
-  // Contraste de línea respecto al fondo cercano, en cada rayo
   const Wn = Math.max(3, Math.round(0.35 * d.w / step));
   const diff = new Float32Array(A * J).fill(NaN);
   const pre = new Float64Array(J + 1), preC = new Float64Array(J + 1);
@@ -458,62 +508,124 @@ function refineRings(P, cal, d){
       const v = pol[i * J + j]; if (isNaN(v)) continue;
       const a = Math.max(0, j - Wn), b = Math.min(J, j + Wn + 1), cnt = preC[b] - preC[a];
       if (cnt < Wn) continue;
-      diff[i * J + j] = (pre[b] - pre[a]) / cnt - v;   // >0: más oscuro que el entorno
+      diff[i * J + j] = (pre[b] - pre[a]) / cnt - v;   // >0: más oscuro que su entorno
     }
   }
-  const dark = new Float32Array(J), light = new Float32Array(J), col = [];
-  for (let j = 0; j < J; j++){
-    col.length = 0;
-    for (let i = 0; i < A; i++){ const v = diff[i * J + j]; if (!isNaN(v)) col.push(v); }
-    if (col.length < A * 0.4){ dark[j] = light[j] = -Infinity; continue; }
-    col.sort((p, q) => p - q);
-    const med = col[col.length >> 1];
-    dark[j] = med; light[j] = -med;
+  // Suavizado entre rayos vecinos (±4°): las líneas son continuas, el ruido no
+  const S = new Float32Array(A * J), G = new Float32Array(A * J);
+  for (let i = 0; i < A; i++) for (let j = 0; j < J; j++){
+    let s1 = 0, c1 = 0, s2 = 0, c2 = 0;
+    for (let di = -2; di <= 2; di++){
+      const ii = (i + di + A) % A, q = ii * J + j;
+      const dv = diff[q]; if (!isNaN(dv)){ s1 += dv; c1++; }
+      const gv = pol[q]; if (!isNaN(gv)){ s2 += gv; c2++; }
+    }
+    S[i * J + j] = c1 >= 3 ? s1 / c1 : NaN;
+    G[i * J + j] = c2 >= 3 ? s2 / c2 : NaN;
   }
-  const peakIn = (prof, lo, hi) => {
+  return { S, G };
+}
+
+function ringPass(P, cal, d){
+  const R = d.negro, A = NANG, sPx = (cal.a + cal.b) / 2 / R;
+  const step = Math.min(0.12, 0.6 / sPx);
+  const J = Math.floor((outerR(d) * 1.25 + 3) / step) + 1;
+  const { S, G } = polarDiff(P, cal, d, step, J);
+  const MINV = 3, win = 0.3 * d.w;
+
+  const peak = (i, lo, hi, sign) => {
     const j0 = Math.max(1, Math.ceil(lo / step)), j1 = Math.min(J - 2, Math.floor(hi / step));
     let bj = -1, bv = -Infinity;
-    for (let j = j0; j <= j1; j++) if (prof[j] > bv){ bv = prof[j]; bj = j; }
-    if (bj <= j0 || bj >= j1) return null;                    // sin máximo claro dentro de la ventana
-    // afinado subpíxel con parábola
-    const y0 = prof[bj - 1], y1 = prof[bj], y2 = prof[bj + 1], den = y0 - 2 * y1 + y2;
-    const off = den < 0 ? 0.5 * (y0 - y2) / den : 0;
-    return { nom: (bj + off) * step, val: bv };
+    for (let j = j0; j <= j1; j++){ const v = sign * S[i * J + j]; if (v > bv){ bv = v; bj = j; } }
+    if (bj <= j0 || bj >= j1 || !(bv >= MINV)) return NaN;
+    const y0 = sign * S[i * J + bj - 1], y1 = bv, y2 = sign * S[i * J + bj + 1], den = y0 - 2 * y1 + y2;
+    const off = den < 0 && isFinite(den) ? 0.5 * (y0 - y2) / den : 0;
+    return (bj + Math.max(-0.5, Math.min(0.5, off))) * step;
   };
+
+  // Borde del negro en cada rayo: el salto más fuerte de oscuro a claro cerca del radio esperado
+  const kd = Math.max(1, Math.round(0.4 / step));
+  const ev = new Float64Array(A).fill(NaN);
+  for (let i = 0; i < A; i++){
+    const j0 = Math.max(kd, Math.ceil((R - 0.3 * d.w) / step)), j1 = Math.min(J - kd - 1, Math.floor((R + 0.3 * d.w) / step));
+    let bj = -1, bv = 15;
+    for (let j = j0; j <= j1; j++){
+      const der = G[i * J + j + kd] - G[i * J + j - kd];
+      if (der > bv){ bv = der; bj = j; }
+    }
+    if (bj > 0) ev[i] = bj * step;
+  }
+  const fe = fitF(ev);
+  const edge = fe ? fe.v : new Float64Array(A).fill(R);
+  const fits = [{ tru: R, nom: edge, c: fe ? fe.c : [R, 0, 0, 0, 0], borde: true }];
   const nEdge = 11 - Math.round((R + PELLET) / d.w);
-  const win = 0.3 * d.w, MINV = 4;
-  const found = [];
-  // Hacia fuera: líneas oscuras sobre el papel
-  let pN = R, pT = R, sp = 1;
-  for (let n = nEdge - 1; n >= 1; n--){
-    const tru = ringR(d, n), pred = pN + (tru - pT) * sp;
-    const pk = peakIn(dark, pred - win * sp, pred + win * sp);
-    if (pk && pk.val >= MINV){
-      const nsp = (pk.nom - pN) / (tru - pT);
-      if (nsp > 0.8 && nsp < 1.25){ found.push({ nom: pk.nom, tru }); sp = nsp; pN = pk.nom; pT = tru; continue; }
-    }
-    pN = pred; pT = tru;
-  }
+
   // Hacia dentro: líneas claras sobre el negro
-  pN = R; pT = R; sp = 1;
+  let prev = edge, prevT = R;
+  let sp = new Float64Array(A).fill(1);
+  let spOut = null;
   for (let n = nEdge + 1; n <= 10; n++){
-    const tru = ringR(d, n), pred = pN - (pT - tru) * sp;
-    const pk = peakIn(light, pred - win * sp, pred + win * sp);
-    if (pk && pk.val >= MINV){
-      const nsp = (pN - pk.nom) / (pT - tru);
-      if (nsp > 0.8 && nsp < 1.25){ found.push({ nom: pk.nom, tru }); sp = nsp; pN = pk.nom; pT = tru; continue; }
+    const tru = ringR(d, n); if (tru < 1) break;
+    const vals = new Float64Array(A).fill(NaN), pred = new Float64Array(A);
+    for (let i = 0; i < A; i++){
+      pred[i] = prev[i] - (prevT - tru) * sp[i];
+      vals[i] = peak(i, pred[i] - win * sp[i], pred[i] + win * sp[i], -1);
     }
-    pN = pred; pT = tru;
+    // Dentro del negro los anillos son pequeños y los agujeros tapan mucho: se ajusta la forma del borde escalada
+    const f = fitF(vals, scaledEdge(edge, tru / R));
+    if (f){
+      for (let i = 0; i < A; i++) sp[i] = Math.min(1.25, Math.max(0.8, (prev[i] - f.v[i]) / (prevT - tru)));
+      if (!spOut) spOut = Float64Array.from(sp);
+      fits.push({ tru, nom: f.v, c: f.c }); prev = f.v;
+    } else prev = pred;
+    prevT = tru;
   }
-  if (found.length < 2) return null;
-  const pts = [{ nom: 0, tru: 0 }, { nom: R, tru: R }, ...found].sort((p, q) => p.tru - q.tru);
-  const nom = [], tru = [];
-  for (const p of pts){
-    if (nom.length && (p.nom <= nom[nom.length - 1] || p.tru <= tru[tru.length - 1])) continue;
-    nom.push(p.nom); tru.push(p.tru);
+
+  // Hacia fuera: líneas oscuras sobre el papel
+  prev = edge; prevT = R; sp = spOut || new Float64Array(A).fill(1);
+  for (let n = nEdge - 1; n >= 1; n--){
+    const tru = ringR(d, n);
+    const vals = new Float64Array(A).fill(NaN), pred = new Float64Array(A);
+    for (let i = 0; i < A; i++){
+      pred[i] = prev[i] + (tru - prevT) * sp[i];
+      vals[i] = peak(i, pred[i] - win * sp[i], pred[i] + win * sp[i], 1);
+    }
+    const f = fitF(vals);
+    if (f){
+      for (let i = 0; i < A; i++) sp[i] = Math.min(1.25, Math.max(0.8, (f.v[i] - prev[i]) / (tru - prevT)));
+      fits.push({ tru, nom: f.v, c: f.c }); prev = f.v;
+    } else prev = pred;
+    prevT = tru;
   }
-  if (nom.length < 3) return null;
-  return { nom, tru, lineas: found.length };
+  return fits;
+}
+
+// Calibra la diana con sus propias líneas impresas. Puede mover el centro (cal.cx, cal.cy).
+function refineRings(P, cal, d){
+  const R = d.negro;
+  let fits = ringPass(P, cal, d);
+  // Recentrar con los anillos interiores: en perspectiva, el centro real no es el centro de la mancha negra
+  const inner = fits.filter(f => !f.borde && f.tru < R);
+  if (inner.length){
+    const dx = inner.reduce((a, f) => a + f.c[1], 0) / inner.length;
+    const dy = inner.reduce((a, f) => a + f.c[2], 0) / inner.length;
+    if (Math.hypot(dx, dy) > 0.5 && Math.hypot(dx, dy) < R * 0.3){
+      const p = nomToPx(cal, R, dx, dy);
+      cal.cx = p.x; cal.cy = p.y;
+      fits = ringPass(P, cal, d);
+    }
+  }
+  fits.sort((p, q) => p.tru - q.tru);
+  // Solo se quedan los anillos que crecen de forma coherente en todos los ángulos
+  const tru = [0], nom = [new Float64Array(NANG)];
+  for (const f of fits){
+    const last = nom[nom.length - 1];
+    let ok = true;
+    for (let i = 0; i < NANG; i++) if (!(f.nom[i] > last[i] + 0.2)){ ok = false; break; }
+    if (ok){ tru.push(f.tru); nom.push(f.nom); }
+  }
+  if (tru.length < 2) return null;
+  return { tru, nom, lineas: tru.length - 2 };   // sin contar el centro ni el borde del negro
 }
 
 function kmeans(pts, n){
@@ -543,18 +655,30 @@ function kmeans(pts, n){
 function detectHoles(P, cal, d, sens){
   const { g, w, h } = P, t0 = P.t0 ?? otsu(g);
   const R = d.negro, s = (cal.a + cal.b) / 2 / R, hr = PELLET * s, A1 = Math.PI * hr * hr;
-  const lim = nomR(cal, outerR(d) + PELLET) + 0.5;
-  const ext = Math.max(cal.a, cal.b) * lim / R;
+  // Borde del negro y límite de puntuación en cada ángulo (mm nominales)
+  const edgeN = new Float64Array(NANG), limN = new Float64Array(NANG);
+  let limMax = 0;
+  for (let i = 0; i < NANG; i++){
+    const t = i / NANG * 2 * Math.PI;
+    edgeN[i] = nomFromTrue(cal, R, t);
+    limN[i] = nomFromTrue(cal, outerR(d) + PELLET, t) + 0.5;
+    if (limN[i] > limMax) limMax = limN[i];
+  }
+  const ext = Math.max(cal.a, cal.b) * limMax / R;
   const x0 = Math.max(0, Math.floor(cal.cx - ext)), x1 = Math.min(w - 1, Math.ceil(cal.cx + ext));
   const y0 = Math.max(0, Math.floor(cal.cy - ext)), y1 = Math.min(h - 1, Math.ceil(cal.cy + ext));
   const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
   if (bw < 8 || bh < 8) return [];
   const co = Math.cos(cal.theta), si = Math.sin(cal.theta), ka = R / cal.a, kb = R / cal.b;
-  const rmm = new Float32Array(bw * bh);
+  const rmm = new Float32Array(bw * bh), ang = new Uint16Array(bw * bh);
   for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++){
     const vx = x + x0 - cal.cx, vy = y + y0 - cal.cy;
     const u = (vx * co + vy * si) * ka, v = (-vx * si + vy * co) * kb;
-    rmm[y * bw + x] = Math.sqrt(u * u + v * v);
+    const X = u * co - v * si, Y = u * si + v * co;
+    const q = y * bw + x;
+    rmm[q] = Math.sqrt(X * X + Y * Y);
+    let a = Math.round(Math.atan2(Y, X) / (2 * Math.PI) * NANG); a = ((a % NANG) + NANG) % NANG;
+    ang[q] = a;
   }
   // Fondo local del papel (media de píxeles de papel en una ventana)
   const W = bw + 1, IS = new Float64Array(W * (bh + 1)), IC = new Float64Array(W * (bh + 1));
@@ -562,7 +686,7 @@ function detectHoles(P, cal, d, sens){
     let rs = 0, rc = 0;
     for (let x = 0; x < bw; x++){
       const q = y * bw + x, gv = g[(y + y0) * w + x + x0];
-      if (rmm[q] > R + 0.6 && gv > t0){ rs += gv; rc++; }
+      if (rmm[q] > edgeN[ang[q]] + 0.6 && gv > t0){ rs += gv; rc++; }
       IS[(y + 1) * W + x + 1] = IS[y * W + x + 1] + rs;
       IC[(y + 1) * W + x + 1] = IC[y * W + x + 1] + rc;
     }
@@ -574,10 +698,10 @@ function detectHoles(P, cal, d, sens){
   for (let y = 0; y < bh; y++){
     const ya = Math.max(0, y - H), yb = Math.min(bh - 1, y + H);
     for (let x = 0; x < bw; x++){
-      const q = y * bw + x, r = rmm[q];
-      if (r > lim) continue;
+      const q = y * bw + x, r = rmm[q], ai = ang[q];
+      if (r > limN[ai]) continue;
       const gv = g[(y + y0) * w + x + x0];
-      if (r < R){ if (gv > tIn) m[q] = 1; continue; }
+      if (r < edgeN[ai]){ if (gv > tIn) m[q] = 1; continue; }
       const xa = Math.max(0, x - H), xb = Math.min(bw - 1, x + H);
       const cnt = IC[(yb + 1) * W + xb + 1] - IC[ya * W + xb + 1] - IC[(yb + 1) * W + xa] + IC[ya * W + xa];
       if (cnt < 12) continue;
@@ -597,9 +721,17 @@ function detectHoles(P, cal, d, sens){
     const bwB = st.maxx - st.minx + 1, bhB = st.maxy - st.miny + 1;
     if (Math.max(bwB, bhB) / Math.min(bwB, bhB) > 2.6) continue;   // franjas y sombras alargadas
     if (st.area / (bwB * bhB) < 0.4) continue;                     // formas huecas o irregulares
+    const cx = x0 + st.sx / st.area, cy = y0 + st.sy / st.area;
+    // Tinta impresa (logotipos, rótulos) en el borde de la diana: no es un impacto
+    let sg = 0;
+    for (let y = st.miny; y <= st.maxy; y++) for (let x = st.minx; x <= st.maxx; x++) if (lab[y * bw + x] === st.id) sg += g[(y + y0) * w + x + x0];
+    if (sg / st.area < t0){
+      const mm = toMM(cal, R, cx, cy);
+      if (Math.hypot(mm.x, mm.y) > outerR(d)) continue;
+    }
     let n = Math.max(1, Math.round(st.area / Aref));
     if (n > 6) continue;
-    if (n === 1){ shots.push({ x: x0 + st.sx / st.area, y: y0 + st.sy / st.area, dudoso:false }); continue; }
+    if (n === 1){ shots.push({ x: cx, y: cy, dudoso:false }); continue; }
     const pts = [];
     for (let y = st.miny; y <= st.maxy; y++) for (let x = st.minx; x <= st.maxx; x++) if (lab[y * bw + x] === st.id) pts.push(x, y);
     for (const c of kmeans(pts, n)) shots.push({ x: x0 + c[0], y: y0 + c[1], dudoso:true });
@@ -690,15 +822,23 @@ function analyze(prefix){
 }
 function redetect(prefix){
   const d = D();
-  St.cal.map = null;
-  St.cal.map = refineRings(St.P, St.cal, d);
+  // Cada ajuste parte del centro original del negro (o de la calibración manual)
+  if (St.cal.cx0 == null){ St.cal.cx0 = St.cal.cx; St.cal.cy0 = St.cal.cy; }
+  // Los anillos solo se recalculan con foto, calibración o disciplina nuevas (no al mover la sensibilidad)
+  if (St.cal.rmapDisc !== St.disc){
+    St.cal.cx = St.cal.cx0; St.cal.cy = St.cal.cy0;
+    St.cal.rmap = null;
+    St.cal.rmap = refineRings(St.P, St.cal, d);
+    St.cal.rmapDisc = St.disc;
+  }
   const found = detectHoles(St.P, St.cal, d, St.sens).map(s => ({ ...s, id: St.nextId++ }));
   St.shots = found;
   St.shots.sort((a, b) => shotInfo(b).dec - shotInfo(a).dec);
   St.sel = -1;
   const dud = St.shots.filter(s => s.dudoso).length;
   let m = (prefix ? prefix + ' ' : '') + (St.calManual ? 'Calibración manual. ' : 'Diana localizada. ');
-  m += St.cal.map ? `Anillos ajustados con ${St.cal.map.lineas} líneas impresas. ` : 'No veo bien las líneas de los anillos: escala calculada solo con el negro. ';
+  const nl = St.cal.rmap ? St.cal.rmap.lineas : 0, tot = 10 - (D().x == null ? 4 : 1);
+  m += nl ? `Anillos ajustados con ${nl} de ${tot} líneas impresas. ` : 'No veo bien las líneas de los anillos: escala calculada solo con el negro. ';
   m += `<b>${St.shots.length} ${St.shots.length === 1 ? 'impacto detectado' : 'impactos detectados'}.</b> `;
   if (dud) m += `${dud} en naranja: posible doble, revísalos. `;
   m += 'Toca un impacto para moverlo o eliminarlo.';
@@ -709,7 +849,10 @@ function redetect(prefix){
 function viewRect(){
   const P = St.P;
   if (St.view === 'target' && St.cal){
-    const d = D(), ext = Math.max(St.cal.a, St.cal.b) * (nomR(St.cal, outerR(d) + PELLET) + 4) / d.negro;
+    const d = D();
+    let lim = 0;
+    for (let i = 0; i < 72; i++) lim = Math.max(lim, nomFromTrue(St.cal, outerR(d) + PELLET, i / 72 * 2 * Math.PI));
+    const ext = Math.max(St.cal.a, St.cal.b) * (lim + 4) / d.negro;
     return { x: St.cal.cx - ext, y: St.cal.cy - ext, w: ext * 2, h: ext * 2 };
   }
   return { x:0, y:0, w:P.w, h:P.h };
@@ -734,6 +877,17 @@ function render(){
   if (St.drag && St.drag.p) drawLoupe(x, k, u, W, H);
 }
 
+// Traza un anillo real (radio en mm) siguiendo la calibración de cada ángulo
+function ringPath(x, c, R, rTrue){
+  x.beginPath();
+  for (let k = 0; k <= 180; k++){
+    const t = k / 180 * 2 * Math.PI, rn = nomFromTrue(c, rTrue, t);
+    const p = nomToPx(c, R, rn * Math.cos(t), rn * Math.sin(t));
+    if (k) x.lineTo(p.x, p.y); else x.moveTo(p.x, p.y);
+  }
+  x.closePath();
+}
+
 function drawOverlay(x, k, u){
   const d = D(), lw = 1.3 * u / k;
   if (St.cal){
@@ -743,13 +897,11 @@ function drawOverlay(x, k, u){
       const rr = ringR(d, n), edge = Math.abs(rr - R) < 0.01;
       x.strokeStyle = edge ? 'rgba(255,184,40,0.95)' : 'rgba(255,184,40,0.6)';
       x.lineWidth = edge ? lw * 1.6 : lw;
-      const rN = nomR(c, rr);
-      x.beginPath(); x.ellipse(c.cx, c.cy, c.a * rN / R, c.b * rN / R, c.theta, 0, Math.PI * 2); x.stroke();
+      ringPath(x, c, R, rr); x.stroke();
     }
     if (d.interior){
       x.lineWidth = lw; x.strokeStyle = 'rgba(255,184,40,0.6)';
-      const rI = nomR(c, d.interior);
-      x.beginPath(); x.ellipse(c.cx, c.cy, c.a * rI / R, c.b * rI / R, c.theta, 0, Math.PI * 2); x.stroke();
+      ringPath(x, c, R, d.interior); x.stroke();
     }
     const cr = 6 * u / k;
     x.strokeStyle = 'rgba(255,184,40,0.95)'; x.lineWidth = lw;
