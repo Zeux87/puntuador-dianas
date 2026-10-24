@@ -363,19 +363,134 @@ function findBlack(P){
     const a = 2 * Math.sqrt(l1), b = 2 * Math.sqrt(l2);
     const theta = 0.5 * Math.atan2(2 * cxy, cxx - cyy);
     const fill = n / (Math.PI * a * b), ratio = b / a, darkF = dark / n;
-    if (fill > 0.88 && fill < 1.12 && ratio > 0.55 && darkF > 0.55 && b > 12){
+    const solid = s.area / n;   // una línea de anillo cerrada rellena da un disco casi vacío de tinta
+    if (fill > 0.88 && fill < 1.12 && ratio > 0.55 && darkF > 0.55 && solid > 0.2 && b > 12){
       if (!best || n > best.n) best = { cx:mx, cy:my, a, b, theta, n };
     }
   }
   return best;
 }
 
+// Interpolación lineal por tramos (con extrapolación por el último tramo)
+function mapF(xs, ys, v){
+  const n = xs.length;
+  if (v <= xs[0]) return ys[0] + (v - xs[0]) * (ys[1] - ys[0]) / (xs[1] - xs[0]);
+  for (let i = 1; i < n; i++) if (v <= xs[i]) return ys[i - 1] + (v - xs[i - 1]) * (ys[i] - ys[i - 1]) / (xs[i] - xs[i - 1]);
+  return ys[n - 1] + (v - xs[n - 1]) * (ys[n - 1] - ys[n - 2]) / (xs[n - 1] - xs[n - 2]);
+}
+// Radio "nominal" (según la elipse del negro) que corresponde a un radio real en mm
+function nomR(cal, r){ return cal && cal.map ? mapF(cal.map.tru, cal.map.nom, r) : r; }
+
 function toMM(cal, R, px, py){
   const c = Math.cos(cal.theta), s = Math.sin(cal.theta);
   const vx = px - cal.cx, vy = py - cal.cy;
   const x1 = vx * c + vy * s, y1 = -vx * s + vy * c;
   const x2 = x1 * R / cal.a, y2 = y1 * R / cal.b;
-  return { x: x2 * c - y2 * s, y: -(x2 * s + y2 * c) };
+  let x3 = x2 * c - y2 * s, y3 = x2 * s + y2 * c;
+  if (cal.map){
+    const rn = Math.hypot(x3, y3);
+    if (rn > 1e-6){ const k = mapF(cal.map.nom, cal.map.tru, rn) / rn; x3 *= k; y3 *= k; }
+  }
+  return { x: x3, y: -y3 };
+}
+// Punto en mm nominales (y hacia abajo, como la imagen) a píxeles
+function nomToPx(cal, R, mx, my){
+  const c = Math.cos(cal.theta), s = Math.sin(cal.theta);
+  const x2 = mx * c + my * s, y2 = -mx * s + my * c;
+  const x1 = x2 * cal.a / R, y1 = y2 * cal.b / R;
+  return { x: cal.cx + x1 * c - y1 * s, y: cal.cy + x1 * s + y1 * c };
+}
+function sampleGray(P, x, y){
+  const { g, w, h } = P;
+  if (x < 0 || y < 0 || x >= w - 1 || y >= h - 1) return NaN;
+  const x0 = x | 0, y0 = y | 0, fx = x - x0, fy = y - y0, i = y0 * w + x0;
+  return (g[i] * (1 - fx) + g[i + 1] * fx) * (1 - fy) + (g[i + w] * (1 - fx) + g[i + w + 1] * fx) * fy;
+}
+
+// Busca las líneas impresas de los anillos y construye la escala radial real.
+// Corrige la distorsión de la foto (papel no plano, lente) que una sola escala no puede absorber.
+function refineRings(P, cal, d){
+  const R = d.negro, sPx = (cal.a + cal.b) / 2 / R;
+  const step = Math.min(0.1, 0.5 / sPx);
+  const rMax = outerR(d) * 1.2 + 2;
+  const J = Math.floor(rMax / step) + 1, A = 240;
+  const pol = new Float32Array(A * J);
+  for (let i = 0; i < A; i++){
+    const t = i / A * 2 * Math.PI, ct = Math.cos(t), st = Math.sin(t);
+    for (let j = 0; j < J; j++){
+      const r = j * step, p = nomToPx(cal, R, r * ct, r * st);
+      pol[i * J + j] = sampleGray(P, p.x, p.y);
+    }
+  }
+  // Contraste de línea respecto al fondo cercano, en cada rayo
+  const Wn = Math.max(3, Math.round(0.35 * d.w / step));
+  const diff = new Float32Array(A * J).fill(NaN);
+  const pre = new Float64Array(J + 1), preC = new Float64Array(J + 1);
+  for (let i = 0; i < A; i++){
+    for (let j = 0; j < J; j++){
+      const v = pol[i * J + j], ok = !isNaN(v);
+      pre[j + 1] = pre[j] + (ok ? v : 0); preC[j + 1] = preC[j] + (ok ? 1 : 0);
+    }
+    for (let j = 0; j < J; j++){
+      const v = pol[i * J + j]; if (isNaN(v)) continue;
+      const a = Math.max(0, j - Wn), b = Math.min(J, j + Wn + 1), cnt = preC[b] - preC[a];
+      if (cnt < Wn) continue;
+      diff[i * J + j] = (pre[b] - pre[a]) / cnt - v;   // >0: más oscuro que el entorno
+    }
+  }
+  const dark = new Float32Array(J), light = new Float32Array(J), col = [];
+  for (let j = 0; j < J; j++){
+    col.length = 0;
+    for (let i = 0; i < A; i++){ const v = diff[i * J + j]; if (!isNaN(v)) col.push(v); }
+    if (col.length < A * 0.4){ dark[j] = light[j] = -Infinity; continue; }
+    col.sort((p, q) => p - q);
+    const med = col[col.length >> 1];
+    dark[j] = med; light[j] = -med;
+  }
+  const peakIn = (prof, lo, hi) => {
+    const j0 = Math.max(1, Math.ceil(lo / step)), j1 = Math.min(J - 2, Math.floor(hi / step));
+    let bj = -1, bv = -Infinity;
+    for (let j = j0; j <= j1; j++) if (prof[j] > bv){ bv = prof[j]; bj = j; }
+    if (bj <= j0 || bj >= j1) return null;                    // sin máximo claro dentro de la ventana
+    // afinado subpíxel con parábola
+    const y0 = prof[bj - 1], y1 = prof[bj], y2 = prof[bj + 1], den = y0 - 2 * y1 + y2;
+    const off = den < 0 ? 0.5 * (y0 - y2) / den : 0;
+    return { nom: (bj + off) * step, val: bv };
+  };
+  const nEdge = 11 - Math.round((R + PELLET) / d.w);
+  const win = 0.3 * d.w, MINV = 4;
+  const found = [];
+  // Hacia fuera: líneas oscuras sobre el papel
+  let pN = R, pT = R, sp = 1;
+  for (let n = nEdge - 1; n >= 1; n--){
+    const tru = ringR(d, n), pred = pN + (tru - pT) * sp;
+    const pk = peakIn(dark, pred - win * sp, pred + win * sp);
+    if (pk && pk.val >= MINV){
+      const nsp = (pk.nom - pN) / (tru - pT);
+      if (nsp > 0.8 && nsp < 1.25){ found.push({ nom: pk.nom, tru }); sp = nsp; pN = pk.nom; pT = tru; continue; }
+    }
+    pN = pred; pT = tru;
+  }
+  // Hacia dentro: líneas claras sobre el negro
+  pN = R; pT = R; sp = 1;
+  for (let n = nEdge + 1; n <= 10; n++){
+    const tru = ringR(d, n), pred = pN - (pT - tru) * sp;
+    const pk = peakIn(light, pred - win * sp, pred + win * sp);
+    if (pk && pk.val >= MINV){
+      const nsp = (pN - pk.nom) / (pT - tru);
+      if (nsp > 0.8 && nsp < 1.25){ found.push({ nom: pk.nom, tru }); sp = nsp; pN = pk.nom; pT = tru; continue; }
+    }
+    pN = pred; pT = tru;
+  }
+  if (found.length < 2) return null;
+  const pts = [{ nom: 0, tru: 0 }, { nom: R, tru: R }, ...found].sort((p, q) => p.tru - q.tru);
+  const nom = [], tru = [];
+  for (const p of pts){
+    if (nom.length && (p.nom <= nom[nom.length - 1] || p.tru <= tru[tru.length - 1])) continue;
+    nom.push(p.nom); tru.push(p.tru);
+  }
+  if (nom.length < 3) return null;
+  return { nom, tru, lineas: found.length };
 }
 
 function kmeans(pts, n){
@@ -405,7 +520,7 @@ function kmeans(pts, n){
 function detectHoles(P, cal, d, sens){
   const { g, w, h } = P, t0 = P.t0 ?? otsu(g);
   const R = d.negro, s = (cal.a + cal.b) / 2 / R, hr = PELLET * s, A1 = Math.PI * hr * hr;
-  const lim = outerR(d) + PELLET + 1.5;
+  const lim = nomR(cal, outerR(d) + PELLET) + 0.5;
   const ext = Math.max(cal.a, cal.b) * lim / R;
   const x0 = Math.max(0, Math.floor(cal.cx - ext)), x1 = Math.min(w - 1, Math.ceil(cal.cx + ext));
   const y0 = Math.max(0, Math.floor(cal.cy - ext)), y1 = Math.min(h - 1, Math.ceil(cal.cy + ext));
@@ -444,7 +559,9 @@ function detectHoles(P, cal, d, sens){
       const cnt = IC[(yb + 1) * W + xb + 1] - IC[ya * W + xb + 1] - IC[(yb + 1) * W + xa] + IC[ya * W + xa];
       if (cnt < 12) continue;
       const sum = IS[(yb + 1) * W + xb + 1] - IS[ya * W + xb + 1] - IS[(yb + 1) * W + xa] + IS[ya * W + xa];
-      if (gv > sum / cnt + delta) m[q] = 1;
+      const bg = sum / cnt;
+      // Más claro que el papel (contraluz) o más oscuro (fondo oscuro detrás de la diana)
+      if (gv > bg + delta || gv < bg - delta * 1.4) m[q] = 1;
     }
   }
   // Apertura: borra líneas de anillos y números, conserva manchas del tamaño de un perdigón
@@ -454,6 +571,9 @@ function detectHoles(P, cal, d, sens){
   const shots = [], Aref = A1 * 0.92;
   for (const st of stats){
     if (st.area < 0.3 * A1) continue;
+    const bwB = st.maxx - st.minx + 1, bhB = st.maxy - st.miny + 1;
+    if (Math.max(bwB, bhB) / Math.min(bwB, bhB) > 2.6) continue;   // franjas y sombras alargadas
+    if (st.area / (bwB * bhB) < 0.4) continue;                     // formas huecas o irregulares
     let n = Math.max(1, Math.round(st.area / Aref));
     if (n > 6) continue;
     if (n === 1){ shots.push({ x: x0 + st.sx / st.area, y: y0 + st.sy / st.area, dudoso:false }); continue; }
@@ -547,12 +667,15 @@ function analyze(prefix){
 }
 function redetect(prefix){
   const d = D();
+  St.cal.map = null;
+  St.cal.map = refineRings(St.P, St.cal, d);
   const found = detectHoles(St.P, St.cal, d, St.sens).map(s => ({ ...s, id: St.nextId++ }));
   St.shots = found;
   St.shots.sort((a, b) => shotInfo(b).dec - shotInfo(a).dec);
   St.sel = -1;
   const dud = St.shots.filter(s => s.dudoso).length;
   let m = (prefix ? prefix + ' ' : '') + (St.calManual ? 'Calibración manual. ' : 'Diana localizada. ');
+  m += St.cal.map ? `Anillos ajustados con ${St.cal.map.lineas} líneas impresas. ` : 'No veo bien las líneas de los anillos: escala calculada solo con el negro. ';
   m += `<b>${St.shots.length} ${St.shots.length === 1 ? 'impacto detectado' : 'impactos detectados'}.</b> `;
   if (dud) m += `${dud} en naranja: posible doble, revísalos. `;
   m += 'Toca un impacto para moverlo o eliminarlo.';
@@ -563,7 +686,7 @@ function redetect(prefix){
 function viewRect(){
   const P = St.P;
   if (St.view === 'target' && St.cal){
-    const d = D(), ext = Math.max(St.cal.a, St.cal.b) * (outerR(d) + PELLET + 4) / d.negro;
+    const d = D(), ext = Math.max(St.cal.a, St.cal.b) * (nomR(St.cal, outerR(d) + PELLET) + 4) / d.negro;
     return { x: St.cal.cx - ext, y: St.cal.cy - ext, w: ext * 2, h: ext * 2 };
   }
   return { x:0, y:0, w:P.w, h:P.h };
@@ -597,11 +720,13 @@ function drawOverlay(x, k, u){
       const rr = ringR(d, n), edge = Math.abs(rr - R) < 0.01;
       x.strokeStyle = edge ? 'rgba(255,184,40,0.95)' : 'rgba(255,184,40,0.6)';
       x.lineWidth = edge ? lw * 1.6 : lw;
-      x.beginPath(); x.ellipse(c.cx, c.cy, c.a * rr / R, c.b * rr / R, c.theta, 0, Math.PI * 2); x.stroke();
+      const rN = nomR(c, rr);
+      x.beginPath(); x.ellipse(c.cx, c.cy, c.a * rN / R, c.b * rN / R, c.theta, 0, Math.PI * 2); x.stroke();
     }
     if (d.interior){
       x.lineWidth = lw; x.strokeStyle = 'rgba(255,184,40,0.6)';
-      x.beginPath(); x.ellipse(c.cx, c.cy, c.a * d.interior / R, c.b * d.interior / R, c.theta, 0, Math.PI * 2); x.stroke();
+      const rI = nomR(c, d.interior);
+      x.beginPath(); x.ellipse(c.cx, c.cy, c.a * rI / R, c.b * rI / R, c.theta, 0, Math.PI * 2); x.stroke();
     }
     const cr = 6 * u / k;
     x.strokeStyle = 'rgba(255,184,40,0.95)'; x.lineWidth = lw;
