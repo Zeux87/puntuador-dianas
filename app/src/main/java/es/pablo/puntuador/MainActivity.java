@@ -26,6 +26,7 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -139,8 +140,61 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (web != null && web.canGoBack()) web.goBack();
-        else super.onBackPressed();
+        if (web == null) {
+            super.onBackPressed();
+            return;
+        }
+        // La página decide si el botón atrás vuelve a una vista anterior; si no, se sale de la app
+        web.evaluateJavascript("(window.onAndroidBack && window.onAndroidBack()) ? 1 : 0", v -> {
+            if (!"1".equals(v)) finish();
+        });
+    }
+
+    /* ---------------- Almacenamiento de sesiones y fotos ---------------- */
+
+    private File dirDatos() {
+        File d = new File(getFilesDir(), "datos");
+        if (!d.exists()) d.mkdirs();
+        return d;
+    }
+
+    private static boolean claveValida(String k) {
+        return k != null && k.matches("[A-Za-z0-9_\\-]{1,80}");
+    }
+
+    private synchronized String leerDato(String clave) {
+        if (!claveValida(clave)) return null;
+        File f = new File(dirDatos(), clave);
+        if (!f.exists()) return null;
+        try (FileInputStream in = new FileInputStream(f)) {
+            return leerTodo(in);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private synchronized boolean escribirDato(String clave, String valor) {
+        if (!claveValida(clave) || valor == null) return false;
+        File dir = dirDatos();
+        File tmp = new File(dir, clave + ".tmp");
+        File destino = new File(dir, clave);
+        try (OutputStream out = new FileOutputStream(tmp)) {
+            out.write(valor.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            tmp.delete();
+            return false;
+        }
+        // Escritura atómica: si algo falla a medias, el archivo anterior sigue intacto
+        if (destino.exists() && !destino.delete()) {
+            tmp.delete();
+            return false;
+        }
+        return tmp.renameTo(destino);
+    }
+
+    private synchronized void borrarDato(String clave) {
+        if (!claveValida(clave)) return;
+        new File(dirDatos(), clave).delete();
     }
 
     /* ---------------- Versión instalada ---------------- */
@@ -316,6 +370,21 @@ public class MainActivity extends Activity {
                 if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Puntuación", texto));
                 Toast.makeText(MainActivity.this, "Resumen copiado", Toast.LENGTH_SHORT).show();
             });
+        }
+
+        @JavascriptInterface
+        public String storeGet(String clave) {
+            return leerDato(clave);
+        }
+
+        @JavascriptInterface
+        public boolean storeSet(String clave, String valor) {
+            return escribirDato(clave, valor);
+        }
+
+        @JavascriptInterface
+        public void storeDelete(String clave) {
+            borrarDato(clave);
         }
 
         @JavascriptInterface

@@ -12,6 +12,7 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 - Localiza el negro de la diana y detecta los impactos.
 - Calcula total, decimal, dieces interiores, punto medio de impactos y agrupación.
 - Deja mover, añadir y eliminar impactos a mano, y calibrar la diana tocando el centro y el borde del negro.
+- Guarda sesiones de entrenamiento y competición: nº de dianas, impactos por diana, foto de cada diana, totales, gráficas e histórico con la evolución.
 - Funciona sin conexión.
 
 ## Estructura

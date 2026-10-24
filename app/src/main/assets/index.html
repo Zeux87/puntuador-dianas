@@ -128,6 +128,65 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
 #appVer{font-weight:600}
 .updmsg{color:var(--muted);font-size:.88rem}
 .notice{background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;font-weight:600}
+/* Navegación y sesiones */
+.tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px}
+.tabs button{flex:1;font:600 .95rem var(--f-body);min-height:40px;border:0;border-radius:7px;background:transparent;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sesbar{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.sesbar.activa{border-color:var(--accent);box-shadow:inset 4px 0 0 var(--accent)}
+.sesbar .eyebrow{margin:0}
+.sesbar .t{font-family:var(--f-display);font-weight:700;font-size:1.3rem;line-height:1.1;text-wrap:balance}
+.sesbar .meta{color:var(--muted);font-size:.88rem;margin:2px 0 0}
+.progress{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.progress i{display:block;height:100%;width:0;background:var(--accent)}
+.warnmsg{color:var(--warn);font-weight:600;font-size:.9rem;margin:0}
+.empty-stage{aspect-ratio:1;max-width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#cdd3cc;text-align:center;padding:24px;line-height:1.4;font-size:.95rem}
+.empty-stage b{display:block;font-family:var(--f-display);font-size:1.7rem;color:#ffffff;margin-bottom:4px}
+.sesview{display:flex;flex-direction:column;gap:14px;max-width:880px;width:100%;margin:0 auto}
+.sesview h2{text-wrap:balance}
+.notice2{background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;padding:10px 12px;font-weight:600;margin:0}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label,.field .lbl{font-weight:600;font-size:.85rem}
+.field small{color:var(--muted);font-size:.78rem}
+.field input,.field textarea,.field select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:42px;width:100%}
+.field textarea{min-height:64px;resize:vertical}
+.field input:focus-visible,.field textarea:focus-visible,.field select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:600 .82rem var(--f-body);padding:7px 11px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+.chip:hover{border-color:var(--accent)}
+.seslist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.seslist button{width:100%;text-align:left;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;cursor:pointer}
+.seslist button:hover{border-color:var(--accent)}
+.seslist .nm{font-weight:600;min-width:0}
+.seslist .mt{color:var(--muted);font-size:.8rem;min-width:0}
+.seslist .sc{grid-column:2;grid-row:1 / span 2;align-self:center;text-align:right;font-family:var(--f-display);font-weight:700;font-size:1.6rem;line-height:1;font-variant-numeric:tabular-nums}
+.seslist .sc small{display:block;font-family:var(--f-body);font-size:.72rem;color:var(--muted);font-weight:400;margin-top:3px}
+.pill{display:inline-block;font-size:.66rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--accent-soft);color:var(--ink);margin-right:6px;vertical-align:2px}
+.pill.comp{background:var(--warn-soft)}
+.pill.live{background:var(--accent);color:var(--accent-ink)}
+.dtitle{font-size:1.6rem;margin:0}
+.dmeta{color:var(--muted);font-size:.88rem;margin:2px 0 0}
+.dnotes{margin:8px 0 0;font-size:.92rem;max-width:65ch}
+.facts.f8{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:520px){.facts.f8{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.chart{width:100%;height:auto;display:block}
+.targets{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.targets button{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px;display:flex;flex-direction:column;gap:4px;cursor:pointer;text-align:left}
+.targets button[aria-current="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.targets img,.targets .noimg{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:#2b302f;display:block}
+.targets .noimg{display:flex;align-items:center;justify-content:center;color:#cdd3cc;font-size:.8rem}
+.targets .row1{display:flex;justify-content:space-between;align-items:baseline;padding:0 4px}
+.targets .num{color:var(--muted);font-size:.8rem}
+.targets .pts{font-family:var(--f-display);font-weight:700;font-size:1.35rem;font-variant-numeric:tabular-nums}
+.targets .sub{color:var(--muted);font-size:.75rem;padding:0 4px 2px}
+.tdetail{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:14px;align-items:start;margin-bottom:12px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+@media (max-width:620px){.tdetail{grid-template-columns:minmax(0,1fr)}}
+.tdetail img{width:100%;border-radius:8px;display:block;background:#2b302f}
+.tinfo{display:flex;flex-direction:column;gap:6px;min-width:0}
+.tinfo .eyebrow{margin:0}
+.tshots{font-family:var(--f-display);font-weight:500;font-size:1.1rem;margin:0;font-variant-numeric:tabular-nums}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -153,8 +212,29 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
     <button id="updBannerBtn" class="btn primary" type="button">Actualizar</button>
   </div>
 
+  <nav class="tabs" role="tablist" aria-label="Secciones">
+    <button id="tabScore" type="button" role="tab" aria-selected="true">Puntuar</button>
+    <button id="tabSes" type="button" role="tab" aria-selected="false">Sesiones</button>
+  </nav>
+
+  <div id="viewScore">
   <main class="grid">
     <section class="stage" aria-label="Foto de la diana">
+      <div id="sesbar" class="sesbar">
+        <div>
+          <p class="eyebrow" id="sesEyebrow">Sin sesión</p>
+          <div class="t" id="sesTitle">Puntuación suelta</div>
+          <p class="meta" id="sesMeta"></p>
+        </div>
+        <div class="progress" id="sesProgress" hidden><i id="sesProgressBar"></i></div>
+        <p class="warnmsg" id="sesWarn" role="alert" hidden></p>
+        <div class="row">
+          <button id="saveTarget" class="btn primary" type="button" hidden>Guardar diana</button>
+          <button id="openSes" class="btn" type="button" hidden>Ver sesión</button>
+          <button id="newSesQuick" class="btn" type="button">Nueva sesión</button>
+        </div>
+      </div>
+
       <div class="row">
         <label class="btn primary" for="cam">Hacer foto</label>
         <input id="cam" type="file" accept="image/*" capture="environment" hidden>
@@ -165,6 +245,7 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
 
       <div class="canvas-wrap" id="cwrap">
         <canvas id="view" aria-label="Foto de la diana con los impactos marcados"></canvas>
+        <div id="emptyStage" class="empty-stage" hidden><div id="emptyText"></div></div>
         <div id="banner" class="banner" hidden><span id="bannerText"></span><button id="bannerCancel" type="button">Cancelar</button></div>
       </div>
       <p id="status" class="status" role="status"></p>
@@ -244,6 +325,78 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
       </div>
     </section>
   </main>
+  </div>
+
+  <section id="viewSessions" class="sesview" aria-label="Sesiones" hidden>
+    <p id="sesNotice" class="notice2" role="status" hidden></p>
+
+    <div id="sesList" class="sesview">
+      <button id="newSesBtn" class="btn primary" type="button">+ Nueva sesión</button>
+
+      <form id="newForm" class="card" hidden novalidate>
+        <h2>Nueva sesión</h2>
+        <div class="field">
+          <span class="lbl">Tipo</span>
+          <div class="row">
+            <button id="fTipoComp" class="btn" type="button" aria-pressed="true">Competición</button>
+            <button id="fTipoEnt" class="btn" type="button" aria-pressed="false">Entrenamiento</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="fNombre">Nombre</label>
+          <input id="fNombre" type="text" maxlength="60" placeholder="Por ejemplo: Liga provincial, 2ª jornada" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="fDisc">Disciplina</label>
+          <select id="fDisc">
+            <option value="pistola">Pistola aire 10 m</option>
+            <option value="carabina">Carabina aire 10 m</option>
+          </select>
+        </div>
+        <div class="chips" id="presets" aria-label="Formatos habituales">
+          <button class="chip" type="button" data-d="12" data-p="5">60 disparos · 12 × 5</button>
+          <button class="chip" type="button" data-d="6" data-p="10">60 disparos · 6 × 10</button>
+          <button class="chip" type="button" data-d="60" data-p="1">60 disparos · 60 × 1</button>
+          <button class="chip" type="button" data-d="8" data-p="5">40 disparos · 8 × 5</button>
+        </div>
+        <div class="grid2">
+          <div class="field">
+            <label for="fDianas">Nº de dianas</label>
+            <input id="fDianas" type="number" inputmode="numeric" min="1" max="200" value="12">
+            <small id="fDianasHint">Obligatorio en competición.</small>
+          </div>
+          <div class="field">
+            <label for="fPor">Impactos por diana</label>
+            <input id="fPor" type="number" inputmode="numeric" min="1" max="20" value="5">
+          </div>
+        </div>
+        <div class="field">
+          <label for="fNotas">Notas</label>
+          <textarea id="fNotas" maxlength="500" placeholder="Arma, munición, condiciones, sensaciones…"></textarea>
+        </div>
+        <p class="warnmsg" id="formMsg" role="alert" hidden></p>
+        <div class="row">
+          <button class="btn primary" type="submit">Empezar sesión</button>
+          <button id="formCancel" class="btn" type="button">Cancelar</button>
+        </div>
+      </form>
+
+      <div id="trendCard" class="card" hidden>
+        <h2>Evolución</h2>
+        <p class="dmeta">Media por impacto en cada sesión terminada.</p>
+        <canvas id="trend" class="chart" aria-label="Evolución de la media por impacto"></canvas>
+      </div>
+
+      <h2>Historial</h2>
+      <p id="sesEmpty" class="empty" hidden>Aún no hay sesiones. Crea una con «+ Nueva sesión» y cada diana que guardes quedará aquí.</p>
+      <ul id="sesItems" class="seslist"></ul>
+    </div>
+
+    <div id="sesDetail" class="sesview" hidden>
+      <button id="backList" class="btn" type="button" style="align-self:flex-start">← Todas las sesiones</button>
+      <div id="detailBody" class="sesview"></div>
+    </div>
+  </section>
 </div>
 
 <script>
@@ -859,7 +1012,9 @@ function viewRect(){
 }
 
 function render(){
-  const cv = $('view'), P = St.P; if (!P) return;
+  const cv = $('view'), P = St.P;
+  $('emptyStage').hidden = !!P; cv.hidden = !P;
+  if (!P) return;
   const r = viewRect();
   const cssW = $('cwrap').clientWidth || 600;
   const u = Math.min(2, window.devicePixelRatio || 1);
@@ -1012,13 +1167,15 @@ function banner(text){
   $('bannerText').textContent = text; b.hidden = false;
 }
 
-function update(){ render(); renderResults(); syncControls(); }
+function update(){ SV.warnCount = false; if ($('sesWarn')) $('sesWarn').hidden = true; render(); renderResults(); syncControls(); }
 
 function syncControls(){
   $('status').innerHTML = St.msg;
   $('addMode').setAttribute('aria-pressed', St.mode === 'add' ? 'true' : 'false');
   $('del').disabled = St.sel < 0;
   $('addMode').disabled = !St.cal;
+  $('calib').disabled = !St.P; $('auto').disabled = !St.P;
+  syncSessionBar();
   $('viewToggle').disabled = !St.cal;
   $('viewToggle').textContent = St.view === 'target' ? 'Ver foto entera' : 'Ver solo la diana';
   $('auto').textContent = St.calManual ? 'Detección automática' : 'Volver a detectar';
@@ -1065,8 +1222,8 @@ function renderResults(){
   drawPlot(info, mpi);
 }
 
-function drawPlot(info, mpi){
-  const cv = $('plot'), d = D();
+function drawPlot(info, mpi){ drawPlotOn($('plot'), D(), info, mpi, St.sel); }
+function drawPlotOn(cv, d, info, mpi, sel){
   const css = cv.clientWidth || 300, u = Math.min(2, window.devicePixelRatio || 1), S = Math.round(css * u);
   if (cv.width !== S){ cv.width = S; cv.height = S; }
   const x = cv.getContext('2d');
@@ -1093,7 +1250,7 @@ function drawPlot(info, mpi){
   info.forEach((s, i) => {
     const px = s.mx * sc, py = -s.my * sc, r = Math.max(PELLET * sc, 4 * u);
     x.beginPath(); x.arc(px, py, r, 0, Math.PI * 2);
-    x.fillStyle = i === St.sel ? 'rgba(255,255,255,0.95)' : 'rgba(22,205,225,0.85)'; x.fill();
+    x.fillStyle = i === sel ? 'rgba(255,255,255,0.95)' : 'rgba(22,205,225,0.85)'; x.fill();
     x.lineWidth = 1.4 * u; x.strokeStyle = '#05303a'; x.stroke();
   });
   if (mpi && info.length > 1){
@@ -1144,6 +1301,467 @@ function restore(){
   } catch (_) {}
 }
 
+/* ===================== Almacenamiento =====================
+   En la app Android se guarda en archivos internos (no se pierde al actualizar).
+   En el navegador, en el almacenamiento local de esta página. */
+const Store = (() => {
+  const A = typeof window !== 'undefined' ? window.AndroidApp : null;
+  const nat = !!(A && A.storeGet);
+  const pre = 'pd_';
+  return {
+    nativo: nat,
+    get(k){ try { return nat ? A.storeGet(k) : localStorage.getItem(pre + k); } catch (_) { return null; } },
+    set(k, v){ try { if (nat) return !!A.storeSet(k, v); localStorage.setItem(pre + k, v); return true; } catch (_) { return false; } },
+    del(k){ try { if (nat) A.storeDelete(k); else localStorage.removeItem(pre + k); } catch (_) {} },
+    getJSON(k, def){ const s = this.get(k); if (!s) return def; try { return JSON.parse(s); } catch (_) { return def; } },
+    setJSON(k, v){ return this.set(k, JSON.stringify(v)); }
+  };
+})();
+
+const nuevoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const fechaCorta = iso => { const d = new Date(iso); return d.toLocaleDateString('es-ES', { day:'2-digit', month:'2-digit', year:'numeric' }); };
+const fechaHora = iso => { const d = new Date(iso); return d.toLocaleDateString('es-ES', { day:'numeric', month:'short' }) + ' · ' + d.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }); };
+const round1 = v => Math.round(v * 10) / 10;
+
+function totalsOf(shots){
+  return {
+    total: shots.reduce((a, s) => a + s.int, 0),
+    dec: round1(shots.reduce((a, s) => a + s.dec, 0)),
+    xs: shots.filter(s => s.x10).length,
+    n: shots.length
+  };
+}
+function groupOf(shots){
+  let g = 0;
+  for (let i = 0; i < shots.length; i++) for (let j = i + 1; j < shots.length; j++) g = Math.max(g, Math.hypot(shots[i].x - shots[j].x, shots[i].y - shots[j].y));
+  return g;
+}
+// Puntuación máxima posible de la sesión
+// (si una diana se guardó con más impactos de los previstos, cuentan todos)
+function maxOf(s){
+  const hechos = s.targets.reduce((a, t) => a + Math.max(s.porDiana, t.shots.length), 0);
+  const quedan = s.dianas ? Math.max(0, s.dianas - s.targets.length) * s.porDiana : 0;
+  return (hechos + quedan) * 10;
+}
+
+const Ses = {
+  index(){ return Store.getJSON('sesiones', []); },
+  load(id){ return Store.getJSON('ses_' + id, null); },
+  save(s){
+    const ok = Store.setJSON('ses_' + s.id, s);
+    const shots = s.targets.flatMap(t => t.shots), t = totalsOf(shots);
+    const ix = this.index().filter(e => e.id !== s.id);
+    ix.push({ id:s.id, nombre:s.nombre, tipo:s.tipo, disc:s.disc, dianas:s.dianas, porDiana:s.porDiana,
+              creada:s.creada, terminada:s.terminada, nT:s.targets.length, nShots:t.n, total:t.total, dec:t.dec, xs:t.xs, max:maxOf(s) });
+    ix.sort((a, b) => b.creada.localeCompare(a.creada));
+    Store.setJSON('sesiones', ix);
+    return ok;
+  },
+  remove(id){
+    const s = this.load(id);
+    if (s) for (const t of s.targets) Store.del('img_' + t.id);
+    Store.del('ses_' + id);
+    Store.setJSON('sesiones', this.index().filter(e => e.id !== id));
+    if (Store.get('activa') === id) Store.del('activa');
+  }
+};
+
+/* ----- Estado de sesiones en la interfaz ----- */
+const SV = { tab:'puntuar', detailId:null, openTarget:null, formOpen:false, tipo:'competicion', warnCount:false, confirmDel:null };
+
+function setTab(tab){
+  SV.tab = tab;
+  $('tabScore').setAttribute('aria-selected', tab === 'puntuar' ? 'true' : 'false');
+  $('tabSes').setAttribute('aria-selected', tab === 'sesiones' ? 'true' : 'false');
+  $('viewScore').hidden = tab !== 'puntuar';
+  $('viewSessions').hidden = tab !== 'sesiones';
+  if (tab === 'puntuar'){ render(); renderResults(); syncControls(); }
+  else renderSessions();
+  try { window.scrollTo(0, 0); } catch (_) {}
+}
+
+/* ----- Barra de sesión en la pantalla de puntuar ----- */
+function syncSessionBar(){
+  const s = St.session, bar = $('sesbar');
+  $('disc').disabled = !!s;
+  if (!s){
+    bar.classList.remove('activa');
+    $('sesEyebrow').textContent = 'Sin sesión';
+    $('sesTitle').textContent = 'Puntuación suelta';
+    $('sesMeta').textContent = 'Lo que puntúes ahora no se guarda. Crea una sesión para llevar el histórico.';
+    $('sesProgress').hidden = true;
+    $('saveTarget').hidden = true; $('openSes').hidden = true; $('newSesQuick').hidden = false;
+    $('sesWarn').hidden = true;
+    $('emptyText').innerHTML = '<b>Haz la foto de la diana</b>Pulsa «Hacer foto» o elige una de la galería.';
+    return;
+  }
+  const n = s.targets.length + 1, tot = totalsOf(s.targets.flatMap(t => t.shots));
+  bar.classList.add('activa');
+  $('sesEyebrow').textContent = (s.tipo === 'competicion' ? 'Competición' : 'Entrenamiento') + ' · en curso';
+  $('sesTitle').textContent = s.nombre;
+  $('sesMeta').textContent = (s.dianas ? `Diana ${n} de ${s.dianas}` : `Diana ${n}`) + ` · ${s.porDiana} ${s.porDiana === 1 ? 'impacto' : 'impactos'} por diana · llevas ${tot.total} puntos`;
+  $('sesProgress').hidden = !s.dianas;
+  if (s.dianas) $('sesProgressBar').style.width = Math.min(100, s.targets.length / s.dianas * 100) + '%';
+  $('saveTarget').hidden = false; $('openSes').hidden = false; $('newSesQuick').hidden = true;
+  $('saveTarget').textContent = `Guardar diana ${n}`;
+  $('saveTarget').disabled = !St.cal;
+  $('emptyText').innerHTML = `<b>Diana ${n}${s.dianas ? ' de ' + s.dianas : ''}</b>Haz la foto o elígela de la galería.`;
+}
+
+function clearStage(msg){
+  St.P = null; St.cal = null; St.shots = []; St.sel = -1; St.sample = false; St.mode = 'edit'; St.calTmp = null;
+  banner(null);
+  St.msg = msg || '';
+  update();
+}
+
+// Imagen reducida de la diana con los anillos y los impactos dibujados
+function makeThumb(){
+  const P = St.P, view = St.view; St.view = 'target';
+  const r = viewRect(); St.view = view;
+  const size = Store.nativo ? 640 : 360, k = size / r.w;
+  const c = document.createElement('canvas'); c.width = size; c.height = Math.round(r.h * k);
+  const x = c.getContext('2d');
+  x.fillStyle = '#2b302f'; x.fillRect(0, 0, c.width, c.height);
+  x.setTransform(k, 0, 0, k, -r.x * k, -r.y * k);
+  x.drawImage(P.canvas, 0, 0);
+  const sel = St.sel; St.sel = -1;
+  drawOverlay(x, k, size / 420);
+  St.sel = sel;
+  return c.toDataURL('image/jpeg', Store.nativo ? 0.75 : 0.6);
+}
+
+function saveTarget(){
+  const s = St.session; if (!s || !St.cal) return;
+  const d = DISC[s.disc], info = St.shots.map(shotInfo);
+  if (info.length !== s.porDiana && !SV.warnCount){
+    SV.warnCount = true;
+    const w = $('sesWarn');
+    w.textContent = `Hay ${info.length} ${info.length === 1 ? 'impacto' : 'impactos'} y la diana debería tener ${s.porDiana}. Añade o quita los que falten, o pulsa otra vez «Guardar» para guardarla así.`;
+    w.hidden = false;
+    return;
+  }
+  SV.warnCount = false; $('sesWarn').hidden = true;
+  const shots = info.map(i => ({ x: Math.round(i.mx * 100) / 100, y: Math.round(i.my * 100) / 100, dec: i.dec, int: i.int, x10: !!i.x }));
+  const t = { id: nuevoId(), fecha: new Date().toISOString(), shots, ...totalsOf(shots), n: s.targets.length + 1, grupo: round1(groupOf(shots)) };
+  let foto = null;
+  try { foto = makeThumb(); } catch (_) {}
+  if (foto) Store.set('img_' + t.id, foto);
+  s.targets.push(t);
+  const fin = s.dianas && s.targets.length >= s.dianas;
+  if (fin){ s.terminada = new Date().toISOString(); }
+  if (!Ses.save(s)){
+    s.targets.pop();
+    $('sesWarn').textContent = 'No se ha podido guardar la diana: el almacenamiento está lleno o no está disponible.';
+    $('sesWarn').hidden = false;
+    return;
+  }
+  if (fin){
+    Store.del('activa'); St.session = null;
+    clearStage('');
+    SV.detailId = s.id; SV.openTarget = null;
+    setTab('sesiones');
+    $('sesNotice').textContent = `Sesión terminada: ${totalsOf(s.targets.flatMap(x => x.shots)).total} de ${maxOf(s)} puntos.`;
+    $('sesNotice').hidden = false;
+    return;
+  }
+  clearStage(`<b>Diana ${t.n} guardada: ${t.total} puntos (${fmt1(t.dec)}).</b> Haz la foto de la diana ${t.n + 1}.`);
+}
+
+function startSession(){
+  const nombre = $('fNombre').value.trim() || ((SV.tipo === 'competicion' ? 'Competición ' : 'Entreno ') + fechaCorta(new Date().toISOString()));
+  const dianasTxt = $('fDianas').value.trim();
+  let dianas = dianasTxt ? Math.max(1, Math.min(200, parseInt(dianasTxt, 10) || 0)) : 0;
+  const porDiana = Math.max(1, Math.min(20, parseInt($('fPor').value, 10) || 5));
+  if (SV.tipo === 'competicion' && !dianas){
+    $('formMsg').textContent = 'En una competición indica cuántas dianas vas a tirar.'; $('formMsg').hidden = false; return;
+  }
+  const s = { id: nuevoId(), nombre, tipo: SV.tipo, disc: $('fDisc').value, dianas: dianas || null, porDiana,
+              notas: $('fNotas').value.trim(), creada: new Date().toISOString(), terminada: null, targets: [] };
+  Ses.save(s);
+  Store.set('activa', s.id);
+  St.session = s;
+  St.disc = s.disc; $('disc').value = s.disc; save();
+  SV.formOpen = false; $('formMsg').hidden = true;
+  $('fNombre').value = ''; $('fNotas').value = '';
+  clearStage('');
+  setTab('puntuar');
+}
+
+function finishSession(id){
+  const s = id === St.session?.id ? St.session : Ses.load(id); if (!s) return;
+  s.terminada = new Date().toISOString();
+  Ses.save(s);
+  if (St.session && St.session.id === id){ St.session = null; Store.del('activa'); syncSessionBar(); }
+  renderSessions();
+}
+function resumeSession(id){
+  const s = Ses.load(id); if (!s) return;
+  s.terminada = null; Ses.save(s);
+  Store.set('activa', id); St.session = s;
+  St.disc = s.disc; $('disc').value = s.disc; save();
+  clearStage('');
+  setTab('puntuar');
+}
+
+/* ----- Gráficas ----- */
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function prepCanvas(cv, hCss){
+  const css = cv.clientWidth || 320, u = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(css * u); cv.height = Math.round(hCss * u);
+  const x = cv.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, cv.width, cv.height);
+  return { x, W: cv.width, H: cv.height, u };
+}
+// Barras: puntos por diana, con línea de la media
+function drawBars(cv, vals, maxV){
+  const { x, W, H, u } = prepCanvas(cv, 170);
+  const ink = cssVar('--ink'), muted = cssVar('--muted'), line = cssVar('--line'), acc = cssVar('--accent'), warn = cssVar('--warn');
+  const padL = 30 * u, padB = 20 * u, padT = 10 * u, pw = W - padL - 6 * u, ph = H - padB - padT;
+  const lo = Math.max(0, Math.floor((Math.min(...vals) - maxV * 0.08) / 5) * 5), hi = maxV;
+  const y = v => padT + ph - (v - lo) / (hi - lo || 1) * ph;
+  x.font = `${10 * u}px "Public Sans", sans-serif`; x.fillStyle = muted; x.textAlign = 'right'; x.textBaseline = 'middle';
+  x.strokeStyle = line; x.lineWidth = 1;
+  for (const v of [lo, Math.round((lo + hi) / 2), hi]){ x.beginPath(); x.moveTo(padL, y(v)); x.lineTo(W, y(v)); x.stroke(); x.fillText(String(v), padL - 5 * u, y(v)); }
+  const bw = pw / vals.length;
+  x.textAlign = 'center'; x.textBaseline = 'top';
+  vals.forEach((v, i) => {
+    x.fillStyle = acc;
+    const bx = padL + i * bw + bw * 0.15, by = y(v);
+    x.fillRect(bx, by, bw * 0.7, padT + ph - by);
+    if (vals.length <= 30 || i % 2 === 0){ x.fillStyle = muted; x.fillText(String(i + 1), padL + i * bw + bw / 2, padT + ph + 5 * u); }
+  });
+  const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+  x.strokeStyle = warn; x.lineWidth = 1.6 * u; x.setLineDash([5 * u, 4 * u]);
+  x.beginPath(); x.moveTo(padL, y(avg)); x.lineTo(W, y(avg)); x.stroke(); x.setLineDash([]);
+  x.fillStyle = ink; x.textAlign = 'right'; x.textBaseline = 'bottom';
+  x.fillText('media ' + fmt1(avg), W - 2 * u, y(avg) - 3 * u);
+}
+// Línea: media por disparo en cada sesión terminada
+function drawTrend(cv, pts){
+  const { x, W, H, u } = prepCanvas(cv, 150);
+  const muted = cssVar('--muted'), line = cssVar('--line'), acc = cssVar('--accent'), ink = cssVar('--ink');
+  const padL = 34 * u, padB = 20 * u, padT = 12 * u, pw = W - padL - 12 * u, ph = H - padB - padT;
+  const vs = pts.map(p => p.v);
+  let lo = Math.floor(Math.min(...vs) * 2) / 2 - 0.5, hi = Math.ceil(Math.max(...vs) * 2) / 2 + 0.5;
+  lo = Math.max(0, lo); hi = Math.min(10.9, hi);
+  const yy = v => padT + ph - (v - lo) / (hi - lo || 1) * ph;
+  const xx = i => padL + (pts.length === 1 ? pw / 2 : i / (pts.length - 1) * pw);
+  x.font = `${10 * u}px "Public Sans", sans-serif`; x.fillStyle = muted; x.textAlign = 'right'; x.textBaseline = 'middle';
+  x.strokeStyle = line; x.lineWidth = 1;
+  for (const v of [lo, (lo + hi) / 2, hi]){ x.beginPath(); x.moveTo(padL, yy(v)); x.lineTo(W, yy(v)); x.stroke(); x.fillText(fmt1(v), padL - 5 * u, yy(v)); }
+  x.textAlign = 'center'; x.textBaseline = 'top';
+  x.fillText(pts[0].label, xx(0), padT + ph + 5 * u);
+  if (pts.length > 1) x.fillText(pts[pts.length - 1].label, xx(pts.length - 1), padT + ph + 5 * u);
+  x.strokeStyle = acc; x.lineWidth = 2.2 * u; x.beginPath();
+  pts.forEach((p, i) => i ? x.lineTo(xx(i), yy(p.v)) : x.moveTo(xx(i), yy(p.v))); x.stroke();
+  pts.forEach((p, i) => { x.beginPath(); x.arc(xx(i), yy(p.v), (i === pts.length - 1 ? 4.5 : 3) * u, 0, Math.PI * 2); x.fillStyle = i === pts.length - 1 ? ink : acc; x.fill(); });
+}
+
+/* ----- Pantalla de sesiones ----- */
+function renderSessions(){
+  if (SV.detailId){ $('sesList').hidden = true; $('sesDetail').hidden = false; renderDetail(); return; }
+  $('sesList').hidden = false; $('sesDetail').hidden = true;
+  $('newForm').hidden = !SV.formOpen;
+  $('newSesBtn').hidden = SV.formOpen;
+  $('fTipoComp').setAttribute('aria-pressed', SV.tipo === 'competicion' ? 'true' : 'false');
+  $('fTipoEnt').setAttribute('aria-pressed', SV.tipo === 'entreno' ? 'true' : 'false');
+  $('presets').hidden = SV.tipo !== 'competicion';
+  $('fDianasHint').textContent = SV.tipo === 'competicion' ? 'Obligatorio en competición.' : 'Déjalo vacío para un entreno sin límite.';
+
+  const ix = Ses.index(), act = St.session?.id;
+  const ul = $('sesItems'); ul.textContent = '';
+  $('sesEmpty').hidden = ix.length > 0;
+  for (const e of ix){
+    const li = document.createElement('li'), b = document.createElement('button');
+    b.type = 'button';
+    const max = e.max ?? (e.dianas || e.nT) * e.porDiana * 10;
+    const media = e.nShots ? fmt1(e.dec / e.nShots) : '–';
+    const estado = e.id === act ? '<span class="pill live">En curso</span>' : (!e.terminada ? '<span class="pill">Sin terminar</span>' : '');
+    b.innerHTML = `<span class="nm">${estado}<span class="pill ${e.tipo === 'competicion' ? 'comp' : ''}">${e.tipo === 'competicion' ? 'Competición' : 'Entreno'}</span>${esc(e.nombre)}</span>
+      <span class="sc">${e.total}<small>de ${max}</small></span>
+      <span class="mt">${fechaCorta(e.creada)} · ${esc(DISC[e.disc]?.nombre || '')} · ${e.nT}${e.dianas ? '/' + e.dianas : ''} dianas · media ${media}</span>`;
+    b.addEventListener('click', () => { SV.detailId = e.id; SV.openTarget = null; $('sesNotice').hidden = true; renderSessions(); try { window.scrollTo(0, 0); } catch (_) {} });
+    li.appendChild(b); ul.appendChild(li);
+  }
+  // Evolución: media por disparo de las sesiones con impactos, de la más antigua a la más reciente
+  const pts = ix.filter(e => e.nShots > 0 && e.terminada).slice(0, 30).reverse()
+               .map(e => ({ v: e.dec / e.nShots, label: fechaCorta(e.creada).slice(0, 5) }));
+  $('trendCard').hidden = pts.length < 2;
+  if (pts.length >= 2) drawTrend($('trend'), pts);
+}
+
+function renderDetail(){
+  const s = SV.detailId === St.session?.id ? St.session : Ses.load(SV.detailId);
+  const box = $('detailBody');
+  if (!s){ SV.detailId = null; renderSessions(); return; }
+  const d = DISC[s.disc], shots = s.targets.flatMap(t => t.shots), T = totalsOf(shots), max = maxOf(s);
+  const activa = St.session && St.session.id === s.id;
+  const best = s.targets.length ? s.targets.reduce((a, t) => t.total > a.total ? t : a) : null;
+  const worst = s.targets.length ? s.targets.reduce((a, t) => t.total < a.total ? t : a) : null;
+  const grupoMedio = s.targets.length ? s.targets.reduce((a, t) => a + (t.grupo || 0), 0) / s.targets.length : 0;
+  let mpiTxt = '–';
+  if (shots.length){
+    const mx = shots.reduce((a, p) => a + p.x, 0) / shots.length, my = shots.reduce((a, p) => a + p.y, 0) / shots.length;
+    mpiTxt = Math.hypot(mx, my) < 0.5 ? 'Centrado' : `${fmt1(Math.hypot(mx, my))} mm<small>a las ${clockOf(mx, my)}</small>`;
+  }
+  const estado = activa ? 'En curso' : (s.terminada ? 'Terminada' : 'Sin terminar');
+  box.innerHTML = `
+    <div class="card">
+      <div>
+        <p class="eyebrow">${s.tipo === 'competicion' ? 'Competición' : 'Entrenamiento'} · ${esc(d.nombre)} · ${estado}</p>
+        <h2 class="dtitle">${esc(s.nombre)}</h2>
+        <p class="dmeta">${fechaHora(s.creada)} · ${s.dianas ? s.dianas + ' dianas' : 'dianas sin límite'} × ${s.porDiana} ${s.porDiana === 1 ? 'impacto' : 'impactos'}</p>
+        ${s.notas ? `<p class="dnotes">${esc(s.notas)}</p>` : ''}
+      </div>
+      <div class="score">
+        <div><p class="eyebrow">Total</p><div class="big">${T.total}<span class="of">/ ${max}</span></div></div>
+        <div class="dec"><p class="eyebrow">Decimal</p><div class="v">${fmt1(T.dec)}</div></div>
+      </div>
+      <dl class="facts f8">
+        <div><dt>Dianas</dt><dd>${s.targets.length}${s.dianas ? '<small>de ' + s.dianas + '</small>' : ''}</dd></div>
+        <div><dt>Impactos</dt><dd>${T.n}</dd></div>
+        <div><dt>Media</dt><dd>${T.n ? fmt1(T.dec / T.n) : '–'}<small>por impacto</small></dd></div>
+        <div><dt>Mejor diana</dt><dd>${best ? best.total : '–'}${best ? '<small>la ' + best.n + 'ª</small>' : ''}</dd></div>
+        <div><dt>Peor diana</dt><dd>${worst ? worst.total : '–'}${worst ? '<small>la ' + worst.n + 'ª</small>' : ''}</dd></div>
+        <div><dt>${d.x != null ? 'Dieces interiores' : 'Dieces'}</dt><dd>${d.x != null ? T.xs : shots.filter(p => p.int === 10).length}</dd></div>
+        <div><dt>Punto medio</dt><dd>${mpiTxt}</dd></div>
+        <div><dt>Agrupación media</dt><dd>${s.targets.length ? fmt1(grupoMedio) + '<small>mm por diana</small>' : '–'}</dd></div>
+      </dl>
+      <div class="row">
+        ${activa ? '<button class="btn primary" type="button" data-act="ir">Seguir puntuando</button>' : ''}
+        ${!activa && !s.terminada ? '<button class="btn primary" type="button" data-act="seguir">Continuar sesión</button>' : ''}
+        ${!activa && s.terminada && !s.dianas ? '<button class="btn" type="button" data-act="seguir">Reabrir</button>' : ''}
+        ${!s.terminada || activa ? '<button class="btn" type="button" data-act="terminar">Terminar sesión</button>' : ''}
+        <button class="btn" type="button" data-act="copiar">Copiar resumen</button>
+        <button class="btn danger" type="button" data-act="borrar">${SV.confirmDel === s.id ? 'Pulsa otra vez para borrar' : 'Borrar sesión'}</button>
+      </div>
+      <span class="copymsg" id="dCopyMsg" role="status"></span>
+      <pre class="fallback" id="dFallback" hidden></pre>
+    </div>
+    ${s.targets.length ? `
+    <div class="card">
+      <h2>Puntos por diana</h2>
+      <canvas id="bars" class="chart" aria-label="Puntos de cada diana"></canvas>
+    </div>
+    <div class="card">
+      <h2>Todos los impactos</h2>
+      <div class="plotbox"><canvas id="allPlot" aria-label="Plano con todos los impactos de la sesión"></canvas></div>
+      <div class="legend"><span><i style="background:#16cde1"></i>Impacto</span><span><i style="background:#ff8a1f"></i>Punto medio</span></div>
+    </div>` : ''}
+    <div class="card">
+      <h2>Dianas</h2>
+      <div id="tview"></div>
+      ${s.targets.length ? '<ul class="targets" id="tlist"></ul>' : '<p class="empty">Todavía no hay dianas guardadas en esta sesión.</p>'}
+    </div>`;
+
+  box.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => {
+    const a = b.dataset.act;
+    if (a === 'ir') setTab('puntuar');
+    else if (a === 'seguir') resumeSession(s.id);
+    else if (a === 'terminar') finishSession(s.id);
+    else if (a === 'copiar') copyText(sessionText(s), $('dCopyMsg'), $('dFallback'));
+    else if (a === 'borrar'){
+      if (SV.confirmDel !== s.id){ SV.confirmDel = s.id; renderDetail(); setTimeout(() => { if (SV.confirmDel === s.id){ SV.confirmDel = null; if (SV.detailId === s.id) renderDetail(); } }, 4000); return; }
+      SV.confirmDel = null;
+      if (activa){ St.session = null; syncSessionBar(); }
+      Ses.remove(s.id); SV.detailId = null; renderSessions();
+    }
+  }));
+
+  if (!s.targets.length) return;
+  drawBars($('bars'), s.targets.map(t => t.total), s.porDiana * 10);
+  const info = shots.map(p => ({ mx: p.x, my: p.y, dist: Math.hypot(p.x, p.y) }));
+  const mpi = { x: info.reduce((a, p) => a + p.mx, 0) / info.length, y: info.reduce((a, p) => a + p.my, 0) / info.length };
+  drawPlotOn($('allPlot'), d, info, mpi, -1);
+
+  const ul = $('tlist');
+  s.targets.forEach((t, i) => {
+    const li = document.createElement('li'), b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('aria-current', SV.openTarget === t.id ? 'true' : 'false');
+    const img = Store.get('img_' + t.id);
+    b.innerHTML = `${img ? `<img alt="Diana ${t.n}" src="${img}">` : '<div class="noimg">Sin foto</div>'}
+      <span class="row1"><span class="num">Diana ${t.n}</span><span class="pts">${t.total}</span></span>
+      <span class="sub">${fmt1(t.dec)}${t.xs ? ' · ' + t.xs + ' X' : ''}</span>`;
+    b.addEventListener('click', () => { SV.openTarget = SV.openTarget === t.id ? null : t.id; renderDetail(); if (SV.openTarget) try { $('tview').scrollIntoView({ block:'nearest' }); } catch (_) {} });
+    li.appendChild(b); ul.appendChild(li);
+  });
+
+  const t = s.targets.find(x => x.id === SV.openTarget);
+  if (t){
+    const img = Store.get('img_' + t.id);
+    $('tview').innerHTML = `<div class="tdetail">
+      ${img ? `<img alt="Diana ${t.n} con los impactos" src="${img}">` : ''}
+      <div class="tinfo">
+        <p class="eyebrow">Diana ${t.n} · ${fechaHora(t.fecha)}</p>
+        <div class="big">${t.total}<span class="of">/ ${t.shots.length * 10}</span></div>
+        <p class="dmeta">${fmt1(t.dec)} decimal${t.xs ? ' · ' + t.xs + ' X' : ''}${t.shots.length > 1 ? ' · agrupación ' + fmt1(t.grupo || 0) + ' mm' : ''}</p>
+        <p class="tshots">${t.shots.map(p => fmt1(p.dec)).join(' · ') || 'Sin impactos'}</p>
+        <div class="row">
+          <button class="btn" type="button" id="tClose">Cerrar</button>
+          <button class="btn danger" type="button" id="tDel">${SV.confirmDel === t.id ? 'Pulsa otra vez para borrar' : 'Borrar diana'}</button>
+        </div>
+      </div></div>`;
+    $('tClose').addEventListener('click', () => { SV.openTarget = null; renderDetail(); });
+    $('tDel').addEventListener('click', () => {
+      if (SV.confirmDel !== t.id){ SV.confirmDel = t.id; renderDetail(); setTimeout(() => { if (SV.confirmDel === t.id){ SV.confirmDel = null; renderDetail(); } }, 4000); return; }
+      SV.confirmDel = null;
+      s.targets = s.targets.filter(x => x.id !== t.id);
+      s.targets.forEach((x, k) => { x.n = k + 1; });
+      Store.del('img_' + t.id);
+      Ses.save(s);
+      if (St.session && St.session.id === s.id){ St.session = s; syncSessionBar(); }
+      SV.openTarget = null; renderDetail();
+    });
+  }
+}
+
+function sessionText(s){
+  const d = DISC[s.disc], T = totalsOf(s.targets.flatMap(t => t.shots));
+  let t = `${s.nombre} · ${s.tipo === 'competicion' ? 'Competición' : 'Entrenamiento'} · ${d.nombre}\n${fechaCorta(s.creada)} · ${s.targets.length}${s.dianas ? ' de ' + s.dianas : ''} dianas × ${s.porDiana} impactos\n`;
+  t += `Total: ${T.total} de ${maxOf(s)} (${fmt1(T.dec)} decimal)`;
+  if (d.x != null) t += ` · ${T.xs} X`;
+  if (T.n) t += ` · media ${fmt1(T.dec / T.n)}`;
+  if (s.targets.length) t += `\nDianas: ${s.targets.map(x => x.total).join(' · ')}`;
+  if (s.notas) t += `\nNotas: ${s.notas}`;
+  return t;
+}
+
+function copyText(t, msgEl, fb){
+  const done = () => { msgEl.textContent = 'Copiado.'; fb.hidden = true; };
+  const fail = () => { fb.textContent = t; fb.hidden = false; msgEl.textContent = 'Mantén pulsado el texto para copiarlo.'; };
+  if (window.AndroidApp && window.AndroidApp.copy){ try { window.AndroidApp.copy(t); done(); } catch (_) { fail(); } return; }
+  try { navigator.clipboard.writeText(t).then(done, fail); } catch (_) { fail(); }
+}
+
+function initSessions(){
+  $('tabScore').addEventListener('click', () => setTab('puntuar'));
+  $('tabSes').addEventListener('click', () => { if (SV.tab === 'sesiones'){ SV.detailId = null; } setTab('sesiones'); });
+  $('newSesBtn').addEventListener('click', () => { SV.formOpen = true; $('fDisc').value = St.disc; renderSessions(); $('fNombre').focus(); });
+  $('newSesQuick').addEventListener('click', () => { SV.detailId = null; SV.formOpen = true; $('fDisc').value = St.disc; setTab('sesiones'); });
+  $('formCancel').addEventListener('click', () => { SV.formOpen = false; $('formMsg').hidden = true; renderSessions(); });
+  $('fTipoComp').addEventListener('click', () => { SV.tipo = 'competicion'; if (!$('fDianas').value) $('fDianas').value = 12; renderSessions(); });
+  $('fTipoEnt').addEventListener('click', () => { SV.tipo = 'entreno'; renderSessions(); });
+  $('presets').querySelectorAll('[data-d]').forEach(b => b.addEventListener('click', () => { $('fDianas').value = b.dataset.d; $('fPor').value = b.dataset.p; }));
+  $('newForm').addEventListener('submit', e => { e.preventDefault(); startSession(); });
+  $('backList').addEventListener('click', () => { SV.detailId = null; SV.openTarget = null; $('sesNotice').hidden = true; renderSessions(); try { window.scrollTo(0, 0); } catch (_) {} });
+  $('saveTarget').addEventListener('click', saveTarget);
+  $('openSes').addEventListener('click', () => { SV.detailId = St.session?.id || null; SV.openTarget = null; setTab('sesiones'); });
+  // Botón atrás de Android: vuelve a la vista anterior antes de salir de la app
+  window.onAndroidBack = () => {
+    if (SV.tab === 'sesiones'){
+      if (SV.openTarget){ SV.openTarget = null; renderDetail(); return true; }
+      if (SV.detailId){ SV.detailId = null; renderSessions(); return true; }
+      if (SV.formOpen){ SV.formOpen = false; renderSessions(); return true; }
+      setTab('puntuar'); return true;
+    }
+    return false;
+  };
+  const act = Store.get('activa');
+  if (act){ const s = Ses.load(act); if (s && !s.terminada){ St.session = s; St.disc = s.disc; } else Store.del('activa'); }
+}
+
 /* ===================== Actualizaciones (solo dentro de la app Android) ===================== */
 function initUpdates(){
   const App = window.AndroidApp;
@@ -1185,6 +1803,7 @@ function initUpdates(){
 function init(){
   restore();
   initUpdates();
+  initSessions();
   $('disc').value = St.disc; $('sens').value = St.sens; $('sensOut').textContent = St.sens;
   const cv = $('view');
   cv.addEventListener('pointerdown', onDown);
@@ -1206,15 +1825,10 @@ function init(){
   $('bannerCancel').addEventListener('click', () => { St.mode = 'edit'; St.calTmp = null; banner(null); if (St.cal) St.view = 'target'; update(); });
   $('auto').addEventListener('click', () => { St.calManual = false; analyze(St.sample ? 'Foto de ejemplo.' : ''); });
   $('viewToggle').addEventListener('click', () => { St.view = St.view === 'target' ? 'full' : 'target'; render(); syncControls(); });
-  $('copy').addEventListener('click', () => {
-    const t = summaryText(), fb = $('fallback');
-    const done = () => { $('copyMsg').textContent = 'Copiado.'; fb.hidden = true; };
-    const fail = () => { fb.textContent = t; fb.hidden = false; $('copyMsg').textContent = 'Mantén pulsado el texto para copiarlo.'; };
-    if (window.AndroidApp && window.AndroidApp.copy){ try { window.AndroidApp.copy(t); done(); } catch (_) { fail(); } return; }
-    try { navigator.clipboard.writeText(t).then(done, fail); } catch (_) { fail(); }
-  });
+  $('copy').addEventListener('click', () => copyText(summaryText(), $('copyMsg'), $('fallback')));
   document.addEventListener('keydown', e => {
-    if ((e.key === 'Delete' || e.key === 'Backspace') && St.sel >= 0 && document.activeElement && document.activeElement.tagName !== 'INPUT'){
+    const tag = document.activeElement ? document.activeElement.tagName : '';
+    if ((e.key === 'Delete' || e.key === 'Backspace') && St.sel >= 0 && SV.tab === 'puntuar' && tag !== 'INPUT' && tag !== 'TEXTAREA'){
       St.shots.splice(St.sel, 1); St.sel = -1; update();
     }
   });
@@ -1222,7 +1836,8 @@ function init(){
     let last = 0;
     new ResizeObserver(() => { const w = $('cwrap').clientWidth; if (w !== last){ last = w; render(); drawPlot(St.cal ? St.shots.map(shotInfo) : [], null); renderResults(); } }).observe($('cwrap'));
   }
-  loadSource(makeSample(), true);
+  if (St.session){ $('disc').value = St.disc; clearStage(''); }
+  else loadSource(makeSample(), true);
 }
 if (typeof document !== 'undefined' && document.getElementById('view')) init();
 </script>
