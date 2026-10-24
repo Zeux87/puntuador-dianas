@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;font:14px system-ui,sans-serif}
+img{max-width:100%}
+[hidden]{display:none!important}
+@font-face{font-family:"Saira Condensed";font-weight:500;font-style:normal;font-display:swap;src:url(fonts/saira-condensed-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Saira Condensed";font-weight:700;font-style:normal;font-display:swap;src:url(fonts/saira-condensed-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Public Sans";font-weight:400;font-style:normal;font-display:swap;src:url(fonts/public-sans-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Public Sans";font-weight:600;font-style:normal;font-display:swap;src:url(fonts/public-sans-latin-600-normal.woff2) format("woff2")}
+</style>
+<title>Puntuador de dianas</title>
+<style>
+/* Layout: mesa de puntuación. Foto con la plantilla de anillos encima a la izquierda, acta de tiradas a la derecha; una columna en el móvil. */
+:root{
+  --bg:#e8ebe6;
+  --surface:#f7f8f5;
+  --ink:#141819;
+  --muted:#59635f;
+  --line:#ccd2cb;
+  --accent:#08727e;
+  --accent-ink:#ffffff;
+  --accent-soft:#d2e8e9;
+  --warn:#9a4f06;
+  --warn-soft:#f6e3cc;
+  --f-display:"Saira Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Public Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1213;--surface:#162022;--ink:#e5eae7;--muted:#92a09b;--line:#29353a;
+    --accent:#45c4d0;--accent-ink:#04191b;--accent-soft:#143a3e;--warn:#f2a65c;--warn-soft:#3a2a17;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1213;--surface:#162022;--ink:#e5eae7;--muted:#92a09b;--line:#29353a;
+  --accent:#45c4d0;--accent-ink:#04191b;--accent-soft:#143a3e;--warn:#f2a65c;--warn-soft:#3a2a17;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:14px 32px;
+}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand svg{flex:none}
+h1{font-family:var(--f-display);font-weight:700;font-size:1.75rem;line-height:1;margin:0;letter-spacing:.01em;text-wrap:balance}
+.brand small{display:block;font-family:var(--f-body);font-size:.78rem;color:var(--muted);letter-spacing:.02em;margin-top:3px}
+select,input[type=range]{font:inherit;color:var(--ink)}
+select{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:42px}
+.grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.stage,.results{display:flex;flex-direction:column;gap:12px;min-width:0}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.btn{
+  font:600 .92rem/1 var(--f-body);display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-height:42px;padding:0 14px;border-radius:8px;border:1px solid var(--line);
+  background:var(--surface);color:var(--ink);cursor:pointer;user-select:none;-webkit-user-select:none;
+}
+.btn:hover{border-color:var(--accent)}
+.btn:focus-visible,select:focus-visible,input:focus-visible+.x,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.danger:not(:disabled){border-color:var(--warn);color:var(--warn)}
+.canvas-wrap{position:relative;width:100%;border-radius:10px;overflow:hidden;background:#2b302f;line-height:0}
+#view{width:100%;height:auto;display:block;touch-action:none;cursor:crosshair}
+.banner{
+  position:absolute;left:10px;right:10px;top:10px;line-height:1.35;
+  background:var(--surface);color:var(--ink);border:1px solid var(--accent);border-radius:8px;
+  padding:10px 12px;font-weight:600;font-size:.92rem;display:flex;justify-content:space-between;gap:10px;align-items:center;
+}
+.banner button{font:600 .85rem var(--f-body);background:none;border:0;color:var(--accent);cursor:pointer;padding:4px}
+.status{margin:0;color:var(--muted);font-size:.9rem;min-height:1.5em}
+.status b{color:var(--ink);font-weight:600}
+.sens{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.sens label{font-weight:600;font-size:.88rem;white-space:nowrap}
+.sens input{flex:1;min-width:0;accent-color:var(--accent)}
+.sens output{font-family:var(--f-display);font-weight:700;font-size:1.1rem;width:2.2em;text-align:right;font-variant-numeric:tabular-nums}
+details.tips{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:0 12px}
+details.tips summary{cursor:pointer;font-weight:600;padding:10px 0;font-size:.92rem}
+details.tips ul{margin:0 0 12px;padding-left:20px;color:var(--muted);font-size:.9rem;display:flex;flex-direction:column;gap:4px;max-width:65ch}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.score{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.big{font-family:var(--f-display);font-weight:700;font-size:4.2rem;line-height:.85;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.big .of{font-size:1.5rem;color:var(--muted);font-weight:500;margin-left:4px}
+.eyebrow{font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0 0 6px}
+.dec{text-align:right}
+.dec .v{font-family:var(--f-display);font-weight:700;font-size:2rem;line-height:1;font-variant-numeric:tabular-nums;color:var(--accent)}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
+.facts div{border-top:1px solid var(--line);padding-top:8px;min-width:0}
+.facts dt{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.facts dd{margin:2px 0 0;font-family:var(--f-display);font-weight:700;font-size:1.25rem;font-variant-numeric:tabular-nums;line-height:1.15}
+.facts dd small{display:block;font-family:var(--f-body);font-weight:400;font-size:.78rem;color:var(--muted)}
+.plotbox{display:flex;justify-content:center}
+#plot{width:100%;max-width:340px;aspect-ratio:1;height:auto;border-radius:50%}
+h2{font-family:var(--f-display);font-weight:700;font-size:1.25rem;margin:0;letter-spacing:.01em}
+.shots{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px}
+.shots button{
+  width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;
+  padding:6px 8px;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:6px;text-align:left;cursor:pointer;
+}
+.shots button[aria-current="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.shots .n{grid-row:span 2;font-family:var(--f-display);font-weight:500;color:var(--muted);font-size:.95rem;align-self:center}
+.shots .v{font-family:var(--f-display);font-weight:700;font-size:1.3rem;line-height:1.05;font-variant-numeric:tabular-nums}
+.shots .v.top{color:var(--accent)}
+.shots .m{font-size:.72rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shots .m.flag{color:var(--warn);font-weight:600}
+.empty{color:var(--muted);font-size:.9rem;margin:0}
+.copyrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.copymsg{font-size:.85rem;color:var(--muted)}
+pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:.85rem;margin:0;user-select:all;-webkit-user-select:all}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem;color:var(--muted);justify-content:center}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true">
+        <circle cx="19" cy="19" r="18" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <circle cx="19" cy="19" r="11" fill="currentColor"/>
+        <circle cx="19" cy="19" r="6.5" fill="none" stroke="var(--bg)" stroke-width="1"/>
+        <circle cx="22.5" cy="16" r="2.4" fill="var(--accent)"/>
+      </svg>
+      <div><h1>Puntuador de dianas</h1><small>Foto de la diana, puntos al momento</small></div>
+    </div>
+    <select id="disc" aria-label="Disciplina">
+      <option value="pistola">Pistola aire 10 m</option>
+      <option value="carabina">Carabina aire 10 m</option>
+    </select>
+  </header>
+
+  <main class="grid">
+    <section class="stage" aria-label="Foto de la diana">
+      <div class="row">
+        <label class="btn primary" for="cam">Hacer foto</label>
+        <input id="cam" type="file" accept="image/*" capture="environment" hidden>
+        <label class="btn" for="gal">Elegir de la galería</label>
+        <input id="gal" type="file" accept="image/*" hidden>
+        <button id="sample" class="btn" type="button">Ver ejemplo</button>
+      </div>
+
+      <div class="canvas-wrap" id="cwrap">
+        <canvas id="view" aria-label="Foto de la diana con los impactos marcados"></canvas>
+        <div id="banner" class="banner" hidden><span id="bannerText"></span><button id="bannerCancel" type="button">Cancelar</button></div>
+      </div>
+      <p id="status" class="status" role="status"></p>
+
+      <div class="row">
+        <button id="addMode" class="btn" type="button" aria-pressed="false">+ Añadir impacto</button>
+        <button id="del" class="btn danger" type="button" disabled>Eliminar impacto</button>
+        <button id="calib" class="btn" type="button">Calibrar a mano</button>
+        <button id="auto" class="btn" type="button">Volver a detectar</button>
+        <button id="viewToggle" class="btn" type="button">Ver foto entera</button>
+      </div>
+
+      <div class="sens">
+        <label for="sens">Sensibilidad</label>
+        <input type="range" id="sens" min="0" max="100" value="60">
+        <output id="sensOut" for="sens">60</output>
+      </div>
+
+      <details class="tips">
+        <summary>Cómo hacer una foto que puntúe bien</summary>
+        <ul>
+          <li>Pon la diana a contraluz: contra una ventana, o sobre una tablet o un móvil con la pantalla en blanco. Si no, sobre un folio blanco.</li>
+          <li>Foto de frente, con la diana plana, entera y sin flash. Que el negro ocupe buena parte de la imagen.</li>
+          <li>Sin contraluz, los impactos en la zona blanca casi no se ven: añádelos tocando «+ Añadir impacto».</li>
+          <li>Los dobles se marcan en naranja como dudosos. Revísalos y arrastra cada impacto a su sitio.</li>
+          <li>Si no localiza la diana, usa «Calibrar a mano»: toca el centro y después el borde del negro.</li>
+          <li>La puntuación sigue la regla ISSF: cuenta el anillo más alto que toque el perdigón de 4,5 mm.</li>
+        </ul>
+      </details>
+    </section>
+
+    <section class="results" aria-label="Puntuación">
+      <div class="card">
+        <div class="score">
+          <div>
+            <p class="eyebrow">Total</p>
+            <div class="big"><span id="tot">0</span><span class="of">/ <span id="max">0</span></span></div>
+          </div>
+          <div class="dec">
+            <p class="eyebrow">Decimal</p>
+            <div class="v" id="decTot">0,0</div>
+          </div>
+        </div>
+        <dl class="facts">
+          <div><dt>Impactos</dt><dd id="cnt">0</dd></div>
+          <div><dt>Dieces interiores</dt><dd id="xs">0</dd></div>
+          <div><dt>Media</dt><dd id="avg">–</dd></div>
+          <div><dt>Punto medio</dt><dd id="mpi">–</dd></div>
+          <div><dt>Agrupación</dt><dd id="grp">–</dd></div>
+          <div><dt>Mejor</dt><dd id="best">–</dd></div>
+        </dl>
+      </div>
+
+      <div class="card">
+        <div class="plotbox"><canvas id="plot" aria-label="Plano de la diana con los impactos"></canvas></div>
+        <div class="legend"><span><i style="background:#16cde1"></i>Impacto</span><span><i style="background:#ff8a1f"></i>Punto medio</span></div>
+        <h2>Impactos</h2>
+        <ol id="list" class="shots"></ol>
+        <p id="emptyList" class="empty" hidden>Aún no hay impactos. Toca «+ Añadir impacto» y después la foto.</p>
+        <div class="copyrow">
+          <button id="copy" class="btn" type="button">Copiar resumen</button>
+          <span id="copyMsg" class="copymsg" role="status"></span>
+        </div>
+        <pre id="fallback" class="fallback" hidden></pre>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ===================== Núcleo: geometría ISSF y visión ===================== */
+const PELLET = 2.25;           // radio del perdigón 4,5 mm
+const MAXP = 1400;             // lado máximo de la imagen de trabajo (px)
+const DISC = {
+  pistola:  { nombre:'Pistola aire 10 m',  w:8,   negro:29.75, x:4.75, interior:2.5 },
+  carabina: { nombre:'Carabina aire 10 m', w:2.5, negro:15.25, x:null, interior:null }
+};
+// Radio (mm) del borde exterior del anillo n: (11-n)*ancho - radio del perdigón
+function ringR(d, n){ return (11 - n) * d.w - PELLET; }
+function outerR(d){ return ringR(d, 1); }
+// Puntuación a partir de la distancia del centro del impacto al centro de la diana (mm)
+function scoreOf(d, dist){
+  const v = 11 - dist / d.w;
+  if (v < 1) return { int:0, dec:0, x:false };
+  const int = Math.min(10, Math.floor(v + 1e-9));
+  const dec = Math.min(10.9, Math.floor(v * 10 + 1e-6) / 10);
+  return { int, dec, x: d.x != null && dist <= d.x };
+}
+
+function newCanvas(w, h){
+  if (typeof document !== 'undefined'){ const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  return globalThis.__mkCanvas(w, h);
+}
+
+function otsu(g){
+  const hist = new Float64Array(256);
+  for (let i = 0; i < g.length; i++) hist[g[i]]++;
+  const total = g.length; let sum = 0;
+  for (let t = 0; t < 256; t++) sum += t * hist[t];
+  let sumB = 0, wB = 0, best = 0, th = 128;
+  for (let t = 0; t < 256; t++){
+    wB += hist[t]; if (!wB) continue;
+    const wF = total - wB; if (!wF) break;
+    sumB += t * hist[t];
+    const mB = sumB / wB, mF = (sum - sumB) / wF;
+    const between = wB * wF * (mB - mF) * (mB - mF);
+    if (between > best){ best = between; th = t; }
+  }
+  return th;
+}
+
+// Componentes conexas (8-vecindad)
+function label(mask, w, h){
+  const lab = new Int32Array(w * h), stack = new Int32Array(w * h), stats = [];
+  let id = 0;
+  for (let i = 0; i < w * h; i++){
+    if (!mask[i] || lab[i]) continue;
+    id++; let sp = 0; stack[sp++] = i; lab[i] = id;
+    const st = { id, area:0, minx:w, maxx:0, miny:h, maxy:0, sx:0, sy:0 };
+    while (sp){
+      const p = stack[--sp], x = p % w, y = (p / w) | 0;
+      st.area++; st.sx += x; st.sy += y;
+      if (x < st.minx) st.minx = x; if (x > st.maxx) st.maxx = x;
+      if (y < st.miny) st.miny = y; if (y > st.maxy) st.maxy = y;
+      for (let dy = -1; dy <= 1; dy++){
+        const ny = y + dy; if (ny < 0 || ny >= h) continue;
+        for (let dx = -1; dx <= 1; dx++){
+          const nx = x + dx; if (nx < 0 || nx >= w) continue;
+          const q = ny * w + nx;
+          if (mask[q] && !lab[q]){ lab[q] = id; stack[sp++] = q; }
+        }
+      }
+    }
+    stats.push(st);
+  }
+  return { lab, stats };
+}
+
+function integ(m, w, h){
+  const W = w + 1, I = new Int32Array(W * (h + 1));
+  for (let y = 0; y < h; y++){
+    let row = 0;
+    for (let x = 0; x < w; x++){ row += m[y * w + x]; I[(y + 1) * W + x + 1] = I[y * W + x + 1] + row; }
+  }
+  return I;
+}
+function boxSum(I, W, x0, y0, x1, y1){
+  return I[(y1 + 1) * W + x1 + 1] - I[y0 * W + x1 + 1] - I[(y1 + 1) * W + x0] + I[y0 * W + x0];
+}
+function erode(m, w, h, k){
+  const r = k >> 1, I = integ(m, w, h), W = w + 1, o = new Uint8Array(w * h), full = (2 * r + 1) * (2 * r + 1);
+  for (let y = r; y < h - r; y++) for (let x = r; x < w - r; x++){
+    const i = y * w + x; if (!m[i]) continue;
+    if (boxSum(I, W, x - r, y - r, x + r, y + r) === full) o[i] = 1;
+  }
+  return o;
+}
+function dilate(m, w, h, k){
+  const r = k >> 1, I = integ(m, w, h), W = w + 1, o = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++){
+    const y0 = Math.max(0, y - r), y1 = Math.min(h - 1, y + r);
+    for (let x = 0; x < w; x++){
+      const x0 = Math.max(0, x - r), x1 = Math.min(w - 1, x + r);
+      if (boxSum(I, W, x0, y0, x1, y1) > 0) o[y * w + x] = 1;
+    }
+  }
+  return o;
+}
+
+// Localiza el negro de la diana: la mayor mancha oscura que, rellenada, es una elipse casi perfecta
+function findBlack(P){
+  const { g, w, h } = P;
+  const t0 = otsu(g); P.t0 = t0;
+  const m = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) m[i] = g[i] < t0 ? 1 : 0;
+  const { lab, stats } = label(m, w, h);
+  const minA = w * h * 0.0015;
+  const cands = stats.filter(s => s.area >= minA && s.minx > 0 && s.miny > 0 && s.maxx < w - 1 && s.maxy < h - 1)
+                     .sort((a, b) => b.area - a.area).slice(0, 10);
+  let best = null;
+  for (const s of cands){
+    const x0 = s.minx - 1, y0 = s.miny - 1, bw = s.maxx - s.minx + 3, bh = s.maxy - s.miny + 3;
+    const out = new Uint8Array(bw * bh), st = new Int32Array(bw * bh); let sp = 0;
+    const inComp = (lx, ly) => { const X = x0 + lx, Y = y0 + ly; if (X < 0 || Y < 0 || X >= w || Y >= h) return false; return lab[Y * w + X] === s.id; };
+    for (let lx = 0; lx < bw; lx++) for (const ly of [0, bh - 1]){ const q = ly * bw + lx; if (!out[q] && !inComp(lx, ly)){ out[q] = 1; st[sp++] = q; } }
+    for (let ly = 0; ly < bh; ly++) for (const lx of [0, bw - 1]){ const q = ly * bw + lx; if (!out[q] && !inComp(lx, ly)){ out[q] = 1; st[sp++] = q; } }
+    while (sp){
+      const p = st[--sp], lx = p % bw, ly = (p / bw) | 0;
+      if (lx > 0){ const q = p - 1; if (!out[q] && !inComp(lx - 1, ly)){ out[q] = 1; st[sp++] = q; } }
+      if (lx < bw - 1){ const q = p + 1; if (!out[q] && !inComp(lx + 1, ly)){ out[q] = 1; st[sp++] = q; } }
+      if (ly > 0){ const q = p - bw; if (!out[q] && !inComp(lx, ly - 1)){ out[q] = 1; st[sp++] = q; } }
+      if (ly < bh - 1){ const q = p + bw; if (!out[q] && !inComp(lx, ly + 1)){ out[q] = 1; st[sp++] = q; } }
+    }
+    let n = 0, sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0, dark = 0;
+    for (let ly = 0; ly < bh; ly++) for (let lx = 0; lx < bw; lx++){
+      if (out[ly * bw + lx]) continue;
+      const X = x0 + lx, Y = y0 + ly;
+      n++; sx += X; sy += Y; sxx += X * X; syy += Y * Y; sxy += X * Y;
+      if (g[Y * w + X] < t0) dark++;
+    }
+    if (n < 50) continue;
+    const mx = sx / n, my = sy / n;
+    const cxx = sxx / n - mx * mx, cyy = syy / n - my * my, cxy = sxy / n - mx * my;
+    const tr = cxx + cyy, det = cxx * cyy - cxy * cxy, disc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+    const l1 = tr / 2 + disc, l2 = tr / 2 - disc;
+    if (l2 <= 0) continue;
+    const a = 2 * Math.sqrt(l1), b = 2 * Math.sqrt(l2);
+    const theta = 0.5 * Math.atan2(2 * cxy, cxx - cyy);
+    const fill = n / (Math.PI * a * b), ratio = b / a, darkF = dark / n;
+    if (fill > 0.88 && fill < 1.12 && ratio > 0.55 && darkF > 0.55 && b > 12){
+      if (!best || n > best.n) best = { cx:mx, cy:my, a, b, theta, n };
+    }
+  }
+  return best;
+}
+
+function toMM(cal, R, px, py){
+  const c = Math.cos(cal.theta), s = Math.sin(cal.theta);
+  const vx = px - cal.cx, vy = py - cal.cy;
+  const x1 = vx * c + vy * s, y1 = -vx * s + vy * c;
+  const x2 = x1 * R / cal.a, y2 = y1 * R / cal.b;
+  return { x: x2 * c - y2 * s, y: -(x2 * s + y2 * c) };
+}
+
+function kmeans(pts, n){
+  const N = pts.length / 2, c = [[pts[0], pts[1]]];
+  while (c.length < n){
+    let bi = 0, bd = -1;
+    for (let i = 0; i < N; i++){
+      let md = Infinity;
+      for (const q of c){ const dd = (pts[2*i] - q[0]) ** 2 + (pts[2*i+1] - q[1]) ** 2; if (dd < md) md = dd; }
+      if (md > bd){ bd = md; bi = i; }
+    }
+    c.push([pts[2*bi], pts[2*bi+1]]);
+  }
+  for (let it = 0; it < 20; it++){
+    const sx = new Float64Array(n), sy = new Float64Array(n), cn = new Float64Array(n);
+    for (let i = 0; i < N; i++){
+      let bj = 0, bd = Infinity;
+      for (let j = 0; j < n; j++){ const dd = (pts[2*i] - c[j][0]) ** 2 + (pts[2*i+1] - c[j][1]) ** 2; if (dd < bd){ bd = dd; bj = j; } }
+      sx[bj] += pts[2*i]; sy[bj] += pts[2*i+1]; cn[bj]++;
+    }
+    for (let j = 0; j < n; j++) if (cn[j]) c[j] = [sx[j] / cn[j], sy[j] / cn[j]];
+  }
+  return c;
+}
+
+// Busca los agujeros: claros dentro del negro; más claros que el papel de alrededor en la zona blanca
+function detectHoles(P, cal, d, sens){
+  const { g, w, h } = P, t0 = P.t0 ?? otsu(g);
+  const R = d.negro, s = (cal.a + cal.b) / 2 / R, hr = PELLET * s, A1 = Math.PI * hr * hr;
+  const lim = outerR(d) + PELLET + 1.5;
+  const ext = Math.max(cal.a, cal.b) * lim / R;
+  const x0 = Math.max(0, Math.floor(cal.cx - ext)), x1 = Math.min(w - 1, Math.ceil(cal.cx + ext));
+  const y0 = Math.max(0, Math.floor(cal.cy - ext)), y1 = Math.min(h - 1, Math.ceil(cal.cy + ext));
+  const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+  if (bw < 8 || bh < 8) return [];
+  const co = Math.cos(cal.theta), si = Math.sin(cal.theta), ka = R / cal.a, kb = R / cal.b;
+  const rmm = new Float32Array(bw * bh);
+  for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++){
+    const vx = x + x0 - cal.cx, vy = y + y0 - cal.cy;
+    const u = (vx * co + vy * si) * ka, v = (-vx * si + vy * co) * kb;
+    rmm[y * bw + x] = Math.sqrt(u * u + v * v);
+  }
+  // Fondo local del papel (media de píxeles de papel en una ventana)
+  const W = bw + 1, IS = new Float64Array(W * (bh + 1)), IC = new Float64Array(W * (bh + 1));
+  for (let y = 0; y < bh; y++){
+    let rs = 0, rc = 0;
+    for (let x = 0; x < bw; x++){
+      const q = y * bw + x, gv = g[(y + y0) * w + x + x0];
+      if (rmm[q] > R + 0.6 && gv > t0){ rs += gv; rc++; }
+      IS[(y + 1) * W + x + 1] = IS[y * W + x + 1] + rs;
+      IC[(y + 1) * W + x + 1] = IC[y * W + x + 1] + rc;
+    }
+  }
+  const delta = 6 + (100 - sens) * 0.35;
+  const tIn = t0 + delta * 0.6;
+  const H = Math.max(4, Math.round(hr * 4));
+  const m = new Uint8Array(bw * bh);
+  for (let y = 0; y < bh; y++){
+    const ya = Math.max(0, y - H), yb = Math.min(bh - 1, y + H);
+    for (let x = 0; x < bw; x++){
+      const q = y * bw + x, r = rmm[q];
+      if (r > lim) continue;
+      const gv = g[(y + y0) * w + x + x0];
+      if (r < R){ if (gv > tIn) m[q] = 1; continue; }
+      const xa = Math.max(0, x - H), xb = Math.min(bw - 1, x + H);
+      const cnt = IC[(yb + 1) * W + xb + 1] - IC[ya * W + xb + 1] - IC[(yb + 1) * W + xa] + IC[ya * W + xa];
+      if (cnt < 12) continue;
+      const sum = IS[(yb + 1) * W + xb + 1] - IS[ya * W + xb + 1] - IS[(yb + 1) * W + xa] + IS[ya * W + xa];
+      if (gv > sum / cnt + delta) m[q] = 1;
+    }
+  }
+  // Apertura: borra líneas de anillos y números, conserva manchas del tamaño de un perdigón
+  const k = Math.max(3, Math.round(hr * 0.9) | 1);
+  const op = dilate(erode(m, bw, bh, k), bw, bh, k);
+  const { lab, stats } = label(op, bw, bh);
+  const shots = [], Aref = A1 * 0.92;
+  for (const st of stats){
+    if (st.area < 0.3 * A1) continue;
+    let n = Math.max(1, Math.round(st.area / Aref));
+    if (n > 6) continue;
+    if (n === 1){ shots.push({ x: x0 + st.sx / st.area, y: y0 + st.sy / st.area, dudoso:false }); continue; }
+    const pts = [];
+    for (let y = st.miny; y <= st.maxy; y++) for (let x = st.minx; x <= st.maxx; x++) if (lab[y * bw + x] === st.id) pts.push(x, y);
+    for (const c of kmeans(pts, n)) shots.push({ x: x0 + c[0], y: y0 + c[1], dudoso:true });
+  }
+  return shots;
+}
+
+// Prepara la imagen de trabajo (escala de grises reducida)
+function prepare(src){
+  const sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height;
+  const sc = Math.min(1, MAXP / Math.max(sw, sh));
+  const w = Math.max(1, Math.round(sw * sc)), h = Math.max(1, Math.round(sh * sc));
+  const c = newCanvas(w, h), x = c.getContext('2d', { willReadFrequently:true });
+  x.drawImage(src, 0, 0, w, h);
+  const data = x.getImageData(0, 0, w, h).data, g = new Uint8Array(w * h);
+  for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = (data[j] * 77 + data[j + 1] * 150 + data[j + 2] * 29) >> 8;
+  return { g, w, h, canvas:c };
+}
+
+// Foto de ejemplo: diana de pistola 10 m, a contraluz, algo girada y en ligera perspectiva
+function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const SAMPLE_SHOTS = [[-6,-9],[2,-4],[-12,3],[5,-14],[-3,-1],[14,-6],[-20,-18],[0,9],[-31,-27],[7,4]];
+function makeSample(){
+  const S = 1100, c = newCanvas(S, S), x = c.getContext('2d'), rnd = rng(7), d = DISC.pistola, s = 5.6;
+  const bgG = x.createLinearGradient(0, 0, S, S); bgG.addColorStop(0, '#59605c'); bgG.addColorStop(1, '#3a3f3d');
+  x.fillStyle = bgG; x.fillRect(0, 0, S, S);
+  x.save(); x.translate(S / 2 + 8, S / 2 + 12); x.rotate(-0.06); x.scale(1, 0.955);
+  const pg = x.createRadialGradient(-150, -200, 50, 0, 0, 700); pg.addColorStop(0, '#e4e6dd'); pg.addColorStop(1, '#cfd2c7');
+  x.fillStyle = pg; x.fillRect(-85 * s, -85 * s, 170 * s, 170 * s);
+  x.strokeStyle = '#1a1a1a'; x.lineWidth = 0.22 * s;
+  for (let n = 1; n <= 6; n++){ x.beginPath(); x.arc(0, 0, ringR(d, n) * s, 0, Math.PI * 2); x.stroke(); }
+  x.fillStyle = '#151515'; x.beginPath(); x.arc(0, 0, d.negro * s, 0, Math.PI * 2); x.fill();
+  x.strokeStyle = '#d9dbd2';
+  for (let n = 8; n <= 10; n++){ x.beginPath(); x.arc(0, 0, ringR(d, n) * s, 0, Math.PI * 2); x.stroke(); }
+  x.beginPath(); x.arc(0, 0, d.interior * s, 0, Math.PI * 2); x.stroke();
+  x.font = 'bold ' + Math.round(3.4 * s) + 'px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  for (let n = 1; n <= 8; n++){
+    const r = (ringR(d, n) + ringR(d, n + 1)) / 2 * s;
+    x.fillStyle = r < d.negro * s ? '#d9dbd2' : '#1a1a1a';
+    for (const [ux, uy] of [[0,-1],[1,0],[0,1],[-1,0]]) x.fillText(String(n), ux * r, uy * r);
+  }
+  for (const [mx, my] of SAMPLE_SHOTS){
+    const px = mx * s, py = -my * s;
+    x.beginPath();
+    for (let i = 0; i <= 28; i++){
+      const a = i / 28 * Math.PI * 2, r = PELLET * s * (0.97 + rnd() * 0.07);
+      const X = px + Math.cos(a) * r, Y = py + Math.sin(a) * r;
+      i ? x.lineTo(X, Y) : x.moveTo(X, Y);
+    }
+    x.closePath(); x.fillStyle = '#fbfbf3'; x.fill();
+  }
+  x.restore();
+  const im = x.getImageData(0, 0, S, S), dd = im.data;
+  for (let i = 0; i < dd.length; i += 4){ const n = (rnd() - 0.5) * 12; dd[i] += n; dd[i + 1] += n; dd[i + 2] += n; }
+  x.putImageData(im, 0, 0);
+  return c;
+}
+
+function clockOf(mx, my){
+  let a = Math.atan2(mx, my) * 180 / Math.PI; if (a < 0) a += 360;
+  const hr = Math.round(a / 30) % 12;
+  return hr === 0 ? 12 : hr;
+}
+const fmt1 = v => v.toFixed(1).replace('.', ',');
+
+/* ===================== Interfaz ===================== */
+const St = { disc:'pistola', P:null, cal:null, calManual:false, shots:[], sel:-1, mode:'edit', calTmp:null,
+             view:'target', sens:60, sample:true, drag:null, nextId:1, k:1, r:{x:0,y:0,w:1,h:1}, u:1, msg:'' };
+const D = () => DISC[St.disc];
+const $ = id => document.getElementById(id);
+
+function shotInfo(sh){
+  const d = D(), mm = toMM(St.cal, d.negro, sh.x, sh.y), dist = Math.hypot(mm.x, mm.y);
+  return { ...scoreOf(d, dist), mx:mm.x, my:mm.y, dist };
+}
+function holePx(){ const d = D(); return PELLET * (St.cal.a + St.cal.b) / 2 / d.negro; }
+
+function analyze(prefix){
+  if (!St.P) return;
+  if (!St.calManual){ St.cal = findBlack(St.P); } else if (St.P.t0 == null){ St.P.t0 = otsu(St.P.g); }
+  if (St.cal){
+    redetect(prefix);
+  } else {
+    St.shots = []; St.sel = -1;
+    St.msg = (prefix ? prefix + ' ' : '') + '<b>No he encontrado el negro de la diana.</b> Pulsa «Calibrar a mano» y toca el centro y luego el borde del negro.';
+    update();
+  }
+}
+function redetect(prefix){
+  const d = D();
+  const found = detectHoles(St.P, St.cal, d, St.sens).map(s => ({ ...s, id: St.nextId++ }));
+  St.shots = found;
+  St.shots.sort((a, b) => shotInfo(b).dec - shotInfo(a).dec);
+  St.sel = -1;
+  const dud = St.shots.filter(s => s.dudoso).length;
+  let m = (prefix ? prefix + ' ' : '') + (St.calManual ? 'Calibración manual. ' : 'Diana localizada. ');
+  m += `<b>${St.shots.length} ${St.shots.length === 1 ? 'impacto detectado' : 'impactos detectados'}.</b> `;
+  if (dud) m += `${dud} en naranja: posible doble, revísalos. `;
+  m += 'Toca un impacto para moverlo o eliminarlo.';
+  St.msg = m;
+  update();
+}
+
+function viewRect(){
+  const P = St.P;
+  if (St.view === 'target' && St.cal){
+    const d = D(), ext = Math.max(St.cal.a, St.cal.b) * (outerR(d) + PELLET + 4) / d.negro;
+    return { x: St.cal.cx - ext, y: St.cal.cy - ext, w: ext * 2, h: ext * 2 };
+  }
+  return { x:0, y:0, w:P.w, h:P.h };
+}
+
+function render(){
+  const cv = $('view'), P = St.P; if (!P) return;
+  const r = viewRect();
+  const cssW = $('cwrap').clientWidth || 600;
+  const u = Math.min(2, window.devicePixelRatio || 1);
+  const k = cssW * u / r.w;
+  const W = Math.max(1, Math.round(r.w * k)), H = Math.max(1, Math.round(r.h * k));
+  if (cv.width !== W) cv.width = W;
+  if (cv.height !== H) cv.height = H;
+  St.k = k; St.r = r; St.u = u;
+  const x = cv.getContext('2d');
+  x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = '#2b302f'; x.fillRect(0, 0, W, H);
+  x.setTransform(k, 0, 0, k, -r.x * k, -r.y * k);
+  x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+  x.drawImage(P.canvas, 0, 0);
+  drawOverlay(x, k, u);
+  if (St.drag && St.drag.p) drawLoupe(x, k, u, W, H);
+}
+
+function drawOverlay(x, k, u){
+  const d = D(), lw = 1.3 * u / k;
+  if (St.cal){
+    const c = St.cal, R = d.negro;
+    x.lineWidth = lw;
+    for (let n = 1; n <= 10; n++){
+      const rr = ringR(d, n), edge = Math.abs(rr - R) < 0.01;
+      x.strokeStyle = edge ? 'rgba(255,184,40,0.95)' : 'rgba(255,184,40,0.6)';
+      x.lineWidth = edge ? lw * 1.6 : lw;
+      x.beginPath(); x.ellipse(c.cx, c.cy, c.a * rr / R, c.b * rr / R, c.theta, 0, Math.PI * 2); x.stroke();
+    }
+    if (d.interior){
+      x.lineWidth = lw; x.strokeStyle = 'rgba(255,184,40,0.6)';
+      x.beginPath(); x.ellipse(c.cx, c.cy, c.a * d.interior / R, c.b * d.interior / R, c.theta, 0, Math.PI * 2); x.stroke();
+    }
+    const cr = 6 * u / k;
+    x.strokeStyle = 'rgba(255,184,40,0.95)'; x.lineWidth = lw;
+    x.beginPath(); x.moveTo(c.cx - cr, c.cy); x.lineTo(c.cx + cr, c.cy); x.moveTo(c.cx, c.cy - cr); x.lineTo(c.cx, c.cy + cr); x.stroke();
+
+    const hr = holePx();
+    St.shots.forEach((sh, i) => {
+      const sel = i === St.sel;
+      x.setLineDash([]);
+      x.beginPath(); x.arc(sh.x, sh.y, hr, 0, Math.PI * 2);
+      if (sel){ x.fillStyle = 'rgba(22,205,225,0.3)'; x.fill(); }
+      x.strokeStyle = 'rgba(0,0,0,0.65)'; x.lineWidth = 4.6 * u / k; x.stroke();
+      x.strokeStyle = sh.dudoso ? '#ff9a2e' : (sel ? '#ffffff' : '#16cde1');
+      x.lineWidth = (sel ? 3 : 2.2) * u / k;
+      if (sh.dudoso) x.setLineDash([5 * u / k, 3 * u / k]);
+      x.stroke(); x.setLineDash([]);
+      const fs = 12 * u / k, label = String(i + 1);
+      x.font = `700 ${fs}px "Saira Condensed", "Arial Narrow", sans-serif`;
+      const tw = x.measureText(label).width, px = sh.x + hr * 0.75, py = sh.y - hr * 0.75 - fs * 0.9;
+      x.fillStyle = sh.dudoso ? '#ff9a2e' : (sel ? '#ffffff' : '#16cde1');
+      x.beginPath(); x.roundRect ? x.roundRect(px, py, tw + fs * 0.7, fs * 1.2, fs * 0.3) : x.rect(px, py, tw + fs * 0.7, fs * 1.2); x.fill();
+      x.fillStyle = '#05181b'; x.textBaseline = 'middle'; x.textAlign = 'left';
+      x.fillText(label, px + fs * 0.35, py + fs * 0.62);
+    });
+  }
+  if (St.calTmp){
+    const cr = 10 * u / k;
+    x.strokeStyle = '#ffb828'; x.lineWidth = 2 * u / k;
+    x.beginPath(); x.moveTo(St.calTmp.x - cr, St.calTmp.y); x.lineTo(St.calTmp.x + cr, St.calTmp.y);
+    x.moveTo(St.calTmp.x, St.calTmp.y - cr); x.lineTo(St.calTmp.x, St.calTmp.y + cr); x.stroke();
+  }
+}
+
+function drawLoupe(x, k, u, W, H){
+  const p = St.drag.p, z = 3, L = Math.min(W, H) * 0.19;
+  const pcx = (p.x - St.r.x) * k;
+  const lx = pcx < W / 2 ? W - L - 12 * u : L + 12 * u, ly = L + 12 * u;
+  x.save(); x.setTransform(1, 0, 0, 1, 0, 0);
+  x.beginPath(); x.arc(lx, ly, L, 0, Math.PI * 2); x.clip();
+  x.fillStyle = '#2b302f'; x.fillRect(lx - L, ly - L, 2 * L, 2 * L);
+  const kz = k * z;
+  x.setTransform(kz, 0, 0, kz, lx - p.x * kz, ly - p.y * kz);
+  x.drawImage(St.P.canvas, 0, 0);
+  drawOverlay(x, kz, u);
+  x.restore();
+  x.save(); x.setTransform(1, 0, 0, 1, 0, 0);
+  x.strokeStyle = '#ffffff'; x.lineWidth = 2 * u;
+  x.beginPath(); x.arc(lx, ly, L, 0, Math.PI * 2); x.stroke();
+  x.restore();
+}
+
+function evtProc(e){
+  const cv = $('view'), b = cv.getBoundingClientRect();
+  const cx = (e.clientX - b.left) * cv.width / b.width, cy = (e.clientY - b.top) * cv.height / b.height;
+  return { x: St.r.x + cx / St.k, y: St.r.y + cy / St.k };
+}
+function hitShot(p){
+  if (!St.cal) return -1;
+  const rad = Math.max(holePx() * 1.4, 22 * St.u / St.k);
+  let bi = -1, bd = Infinity;
+  St.shots.forEach((s, i) => { const dd = Math.hypot(s.x - p.x, s.y - p.y); if (dd < rad && dd < bd){ bd = dd; bi = i; } });
+  return bi;
+}
+
+function onDown(e){
+  e.preventDefault();
+  const p = evtProc(e), cv = $('view');
+  if (St.mode === 'cal1'){ St.calTmp = p; St.mode = 'cal2'; banner('Ahora toca el borde exterior del negro.'); render(); return; }
+  if (St.mode === 'cal2'){
+    const r = Math.hypot(p.x - St.calTmp.x, p.y - St.calTmp.y);
+    if (r * St.k / St.u < 8) return;
+    St.cal = { cx: St.calTmp.x, cy: St.calTmp.y, a: r, b: r, theta: 0 };
+    St.calManual = true; St.calTmp = null; St.mode = 'edit'; banner(null);
+    if (St.P.t0 == null) St.P.t0 = otsu(St.P.g);
+    redetect(); return;
+  }
+  if (!St.cal) return;
+  const hit = hitShot(p);
+  if (hit >= 0){
+    St.sel = hit;
+    St.drag = { i: hit, ox: St.shots[hit].x - p.x, oy: St.shots[hit].y - p.y, start: p, moved: false, p: null };
+    try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+  } else if (St.mode === 'add'){
+    St.shots.push({ id: St.nextId++, x: p.x, y: p.y, dudoso: false });
+    St.sel = St.shots.length - 1;
+    St.drag = { i: St.sel, ox: 0, oy: 0, start: p, moved: true, p: { x: p.x, y: p.y } };
+    try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+  } else {
+    St.sel = -1;
+  }
+  update();
+}
+function onMove(e){
+  if (!St.drag) return;
+  const p = evtProc(e), dr = St.drag;
+  if (!dr.moved && Math.hypot(p.x - dr.start.x, p.y - dr.start.y) * St.k / St.u < 4) return;
+  dr.moved = true;
+  const sh = St.shots[dr.i];
+  sh.x = p.x + dr.ox; sh.y = p.y + dr.oy; sh.dudoso = false;
+  dr.p = { x: sh.x, y: sh.y };
+  render(); renderResults();
+}
+function onUp(){ if (!St.drag) return; St.drag = null; update(); }
+
+function banner(text){
+  const b = $('banner');
+  if (!text){ b.hidden = true; return; }
+  $('bannerText').textContent = text; b.hidden = false;
+}
+
+function update(){ render(); renderResults(); syncControls(); }
+
+function syncControls(){
+  $('status').innerHTML = St.msg;
+  $('addMode').setAttribute('aria-pressed', St.mode === 'add' ? 'true' : 'false');
+  $('del').disabled = St.sel < 0;
+  $('addMode').disabled = !St.cal;
+  $('viewToggle').disabled = !St.cal;
+  $('viewToggle').textContent = St.view === 'target' ? 'Ver foto entera' : 'Ver solo la diana';
+  $('auto').textContent = St.calManual ? 'Detección automática' : 'Volver a detectar';
+}
+
+function renderResults(){
+  const d = D(), info = St.cal ? St.shots.map(shotInfo) : [];
+  const n = info.length;
+  const tot = info.reduce((a, s) => a + s.int, 0);
+  const dec = Math.round(info.reduce((a, s) => a + s.dec, 0) * 10) / 10;
+  const xs = info.filter(s => s.x).length;
+  $('tot').textContent = tot;
+  $('max').textContent = n * 10;
+  $('decTot').textContent = fmt1(dec);
+  $('cnt').textContent = n;
+  $('xs').textContent = d.x == null ? '–' : xs;
+  $('avg').textContent = n ? fmt1(dec / n) : '–';
+  $('best').textContent = n ? fmt1(Math.max(...info.map(s => s.dec))) : '–';
+  let mpi = null;
+  if (n){
+    const mx = info.reduce((a, s) => a + s.mx, 0) / n, my = info.reduce((a, s) => a + s.my, 0) / n;
+    const md = Math.hypot(mx, my);
+    mpi = { x: mx, y: my };
+    $('mpi').innerHTML = md < 0.5 ? 'Centrado' : `${fmt1(md)} mm<small>a las ${clockOf(mx, my)}</small>`;
+  } else $('mpi').textContent = '–';
+  if (n >= 2){
+    let g = 0;
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) g = Math.max(g, Math.hypot(info[i].mx - info[j].mx, info[i].my - info[j].my));
+    $('grp').innerHTML = `${fmt1(g)} mm<small>centro a centro</small>`;
+  } else $('grp').textContent = '–';
+
+  const ol = $('list'); ol.textContent = '';
+  info.forEach((s, i) => {
+    const li = document.createElement('li'), b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('aria-current', i === St.sel ? 'true' : 'false');
+    const note = St.shots[i].dudoso ? '<span class="m flag">¿doble?</span>' : `<span class="m">${s.x ? 'X · ' : ''}a las ${clockOf(s.mx, s.my)}</span>`;
+    b.innerHTML = `<span class="n">${i + 1}</span><span class="v${s.int === 10 ? ' top' : ''}">${fmt1(s.dec)}</span>${note}`;
+    b.setAttribute('aria-label', `Impacto ${i + 1}: ${fmt1(s.dec)} puntos`);
+    b.addEventListener('click', () => { St.sel = i === St.sel ? -1 : i; update(); });
+    li.appendChild(b); ol.appendChild(li);
+  });
+  $('emptyList').hidden = n > 0;
+  drawPlot(info, mpi);
+}
+
+function drawPlot(info, mpi){
+  const cv = $('plot'), d = D();
+  const css = cv.clientWidth || 300, u = Math.min(2, window.devicePixelRatio || 1), S = Math.round(css * u);
+  if (cv.width !== S){ cv.width = S; cv.height = S; }
+  const x = cv.getContext('2d');
+  x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, S, S);
+  const maxD = info.reduce((a, s) => Math.max(a, s.dist), 0);
+  const E = Math.min(outerR(d) + PELLET + 1, Math.max(d.negro * 1.12, maxD + PELLET + 3));
+  const sc = (S / 2) / E;
+  x.translate(S / 2, S / 2);
+  x.fillStyle = '#e6e8df'; x.beginPath(); x.arc(0, 0, S / 2, 0, Math.PI * 2); x.fill();
+  x.lineWidth = Math.max(1, 0.9 * u);
+  x.strokeStyle = '#1c1f1e';
+  for (let n = 1; n <= 10; n++){ const r = ringR(d, n); if (r > d.negro && r < E){ x.beginPath(); x.arc(0, 0, r * sc, 0, Math.PI * 2); x.stroke(); } }
+  x.fillStyle = '#161918'; x.beginPath(); x.arc(0, 0, d.negro * sc, 0, Math.PI * 2); x.fill();
+  x.strokeStyle = '#d9dcd2';
+  for (let n = 1; n <= 10; n++){ const r = ringR(d, n); if (r < d.negro - 0.01 && r > 0){ x.beginPath(); x.arc(0, 0, r * sc, 0, Math.PI * 2); x.stroke(); } }
+  if (d.interior){ x.beginPath(); x.arc(0, 0, d.interior * sc, 0, Math.PI * 2); x.stroke(); }
+  x.font = `600 ${Math.round(10 * u)}px "Public Sans", sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+  for (let n = 1; n <= 9; n++){
+    const rm = (ringR(d, n) + ringR(d, n + 1)) / 2;
+    if (rm * sc > S / 2 - 8 * u || (ringR(d, n) - ringR(d, n + 1)) * sc < 13 * u) continue;
+    x.fillStyle = rm < d.negro ? '#c9ccc2' : '#3a3e3c';
+    x.fillText(String(n), 0, -rm * sc);
+  }
+  info.forEach((s, i) => {
+    const px = s.mx * sc, py = -s.my * sc, r = Math.max(PELLET * sc, 4 * u);
+    x.beginPath(); x.arc(px, py, r, 0, Math.PI * 2);
+    x.fillStyle = i === St.sel ? 'rgba(255,255,255,0.95)' : 'rgba(22,205,225,0.85)'; x.fill();
+    x.lineWidth = 1.4 * u; x.strokeStyle = '#05303a'; x.stroke();
+  });
+  if (mpi && info.length > 1){
+    const px = mpi.x * sc, py = -mpi.y * sc, a = 7 * u;
+    x.strokeStyle = '#ff8a1f'; x.lineWidth = 2.4 * u;
+    x.beginPath(); x.moveTo(px - a, py); x.lineTo(px + a, py); x.moveTo(px, py - a); x.lineTo(px, py + a); x.stroke();
+  }
+}
+
+function summaryText(){
+  const d = D(), info = St.cal ? St.shots.map(shotInfo) : [], n = info.length;
+  const tot = info.reduce((a, s) => a + s.int, 0), dec = Math.round(info.reduce((a, s) => a + s.dec, 0) * 10) / 10;
+  const xs = info.filter(s => s.x).length;
+  let t = `${d.nombre} · ${n} impactos\nTotal: ${tot} de ${n * 10} (${fmt1(dec)} decimal)`;
+  if (d.x != null) t += ` · ${xs} X`;
+  if (n) t += `\nImpactos: ${info.map(s => fmt1(s.dec)).join(' · ')}`;
+  if (n){
+    const mx = info.reduce((a, s) => a + s.mx, 0) / n, my = info.reduce((a, s) => a + s.my, 0) / n;
+    t += `\nPunto medio: ${fmt1(Math.hypot(mx, my))} mm a las ${clockOf(mx, my)}`;
+  }
+  if (n >= 2){
+    let g = 0;
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) g = Math.max(g, Math.hypot(info[i].mx - info[j].mx, info[i].my - info[j].my));
+    t += ` · Agrupación ${fmt1(g)} mm`;
+  }
+  return t;
+}
+
+function loadSource(src, isSample){
+  St.P = prepare(src); St.cal = null; St.calManual = false; St.sample = isSample;
+  St.mode = 'edit'; St.calTmp = null; banner(null); St.view = 'target';
+  analyze(isSample ? 'Foto de ejemplo.' : '');
+}
+function loadFile(file){
+  if (!file) return;
+  const url = URL.createObjectURL(file), img = new Image();
+  img.onload = () => { loadSource(img, false); URL.revokeObjectURL(url); };
+  img.onerror = () => { St.msg = '<b>No he podido abrir esa imagen.</b> Prueba con una foto JPG o PNG.'; syncControls(); URL.revokeObjectURL(url); };
+  img.src = url;
+}
+
+function save(){ try { localStorage.setItem('puntuador', JSON.stringify({ disc: St.disc, sens: St.sens })); } catch (_) {} }
+function restore(){
+  try {
+    const o = JSON.parse(localStorage.getItem('puntuador') || 'null');
+    if (o && DISC[o.disc]) St.disc = o.disc;
+    if (o && typeof o.sens === 'number') St.sens = Math.max(0, Math.min(100, o.sens));
+  } catch (_) {}
+}
+
+function init(){
+  restore();
+  $('disc').value = St.disc; $('sens').value = St.sens; $('sensOut').textContent = St.sens;
+  const cv = $('view');
+  cv.addEventListener('pointerdown', onDown);
+  cv.addEventListener('pointermove', onMove);
+  cv.addEventListener('pointerup', onUp);
+  cv.addEventListener('pointercancel', onUp);
+  $('cam').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
+  $('gal').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
+  $('sample').addEventListener('click', () => loadSource(makeSample(), true));
+  $('disc').addEventListener('change', e => { St.disc = e.target.value; save(); if (St.cal) redetect(St.sample ? 'Foto de ejemplo.' : ''); else update(); });
+  let tmr = null;
+  $('sens').addEventListener('input', e => {
+    St.sens = +e.target.value; $('sensOut').textContent = St.sens; save();
+    clearTimeout(tmr); tmr = setTimeout(() => { if (St.cal) redetect(St.sample ? 'Foto de ejemplo.' : ''); }, 220);
+  });
+  $('addMode').addEventListener('click', () => { St.mode = St.mode === 'add' ? 'edit' : 'add'; if (St.mode === 'add') St.msg = 'Toca la foto donde esté cada impacto que falte. Pulsa otra vez el botón para terminar.'; syncControls(); });
+  $('del').addEventListener('click', () => { if (St.sel < 0) return; St.shots.splice(St.sel, 1); St.sel = -1; update(); });
+  $('calib').addEventListener('click', () => { St.mode = 'cal1'; St.calTmp = null; St.view = 'full'; banner('Toca el centro de la diana.'); update(); });
+  $('bannerCancel').addEventListener('click', () => { St.mode = 'edit'; St.calTmp = null; banner(null); if (St.cal) St.view = 'target'; update(); });
+  $('auto').addEventListener('click', () => { St.calManual = false; analyze(St.sample ? 'Foto de ejemplo.' : ''); });
+  $('viewToggle').addEventListener('click', () => { St.view = St.view === 'target' ? 'full' : 'target'; render(); syncControls(); });
+  $('copy').addEventListener('click', () => {
+    const t = summaryText(), fb = $('fallback');
+    const done = () => { $('copyMsg').textContent = 'Copiado.'; fb.hidden = true; };
+    const fail = () => { fb.textContent = t; fb.hidden = false; $('copyMsg').textContent = 'Mantén pulsado el texto para copiarlo.'; };
+    if (window.AndroidApp && window.AndroidApp.copy){ try { window.AndroidApp.copy(t); done(); } catch (_) { fail(); } return; }
+    try { navigator.clipboard.writeText(t).then(done, fail); } catch (_) { fail(); }
+  });
+  document.addEventListener('keydown', e => {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && St.sel >= 0 && document.activeElement && document.activeElement.tagName !== 'INPUT'){
+      St.shots.splice(St.sel, 1); St.sel = -1; update();
+    }
+  });
+  if (typeof ResizeObserver !== 'undefined'){
+    let last = 0;
+    new ResizeObserver(() => { const w = $('cwrap').clientWidth; if (w !== last){ last = w; render(); drawPlot(St.cal ? St.shots.map(shotInfo) : [], null); renderResults(); } }).observe($('cwrap'));
+  }
+  loadSource(makeSample(), true);
+}
+if (typeof document !== 'undefined' && document.getElementById('view')) init();
+</script>
+
+</html>
