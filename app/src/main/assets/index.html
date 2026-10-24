@@ -122,6 +122,12 @@ h2{font-family:var(--f-display);font-weight:700;font-size:1.25rem;margin:0;lette
 pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:.85rem;margin:0;user-select:all;-webkit-user-select:all}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem;color:var(--muted);justify-content:center}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.appbox{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.appinfo{display:flex;flex-direction:column;gap:2px}
+.appinfo .eyebrow{margin:0}
+#appVer{font-weight:600}
+.updmsg{color:var(--muted);font-size:.88rem}
+.notice{background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;font-weight:600}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -141,6 +147,11 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
       <option value="carabina">Carabina aire 10 m</option>
     </select>
   </header>
+
+  <div id="updBanner" class="notice" hidden>
+    <span id="updBannerText">Hay una versión nueva.</span>
+    <button id="updBannerBtn" class="btn primary" type="button">Actualizar</button>
+  </div>
 
   <main class="grid">
     <section class="stage" aria-label="Foto de la diana">
@@ -183,6 +194,18 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
           <li>La puntuación sigue la regla ISSF: cuenta el anillo más alto que toque el perdigón de 4,5 mm.</li>
         </ul>
       </details>
+
+      <div id="appBox" class="appbox" hidden>
+        <div class="appinfo">
+          <p class="eyebrow">App</p>
+          <span id="appVer">Versión</span>
+          <span id="updMsg" class="updmsg" role="status"></span>
+        </div>
+        <div class="row">
+          <button id="updCheck" class="btn" type="button">Buscar actualizaciones</button>
+          <button id="updInstall" class="btn primary" type="button" hidden>Actualizar</button>
+        </div>
+      </div>
     </section>
 
     <section class="results" aria-label="Puntuación">
@@ -969,8 +992,47 @@ function restore(){
   } catch (_) {}
 }
 
+/* ===================== Actualizaciones (solo dentro de la app Android) ===================== */
+function initUpdates(){
+  const App = window.AndroidApp;
+  if (!App || !App.checkUpdate) return;
+  $('appBox').hidden = false;
+  try { $('appVer').textContent = 'Versión ' + App.versionName(); } catch (_) {}
+  const msg = t => { $('updMsg').textContent = t; };
+  let manual = false, busy = false;
+  const install = () => {
+    if (busy) return;
+    busy = true; $('updInstall').disabled = true; $('updBannerBtn').disabled = true;
+    msg('Descargando la versión nueva…');
+    App.installUpdate();
+  };
+  window.onUpdateInfo = info => {
+    $('updCheck').disabled = false;
+    if (info.error){ if (manual) msg(info.error); return; }
+    if (info.available){
+      msg(`Hay una versión nueva: ${info.latest}. Tienes la ${info.current}.`);
+      $('updInstall').hidden = false; $('updInstall').textContent = 'Actualizar a ' + info.latest;
+      $('updBannerText').textContent = `Hay una versión nueva de la app (${info.latest}).`;
+      $('updBanner').hidden = false;
+    } else {
+      $('updInstall').hidden = true; $('updBanner').hidden = true;
+      if (manual) msg(`Tienes la última versión (${info.current}).`);
+    }
+  };
+  window.onUpdateProgress = pct => { msg(`Descargando… ${pct} %`); };
+  window.onUpdateDone = text => {
+    busy = false; $('updInstall').disabled = false; $('updBannerBtn').disabled = false;
+    msg(text);
+  };
+  $('updCheck').addEventListener('click', () => { manual = true; $('updCheck').disabled = true; msg('Buscando…'); App.checkUpdate(); });
+  $('updInstall').addEventListener('click', install);
+  $('updBannerBtn').addEventListener('click', install);
+  App.checkUpdate();   // comprobación silenciosa al abrir
+}
+
 function init(){
   restore();
+  initUpdates();
   $('disc').value = St.disc; $('sens').value = St.sens; $('sensOut').textContent = St.sens;
   const cv = $('view');
   cv.addEventListener('pointerdown', onDown);

@@ -20,4 +20,8 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 - `app/src/main/java/es/pablo/puntuador/MainActivity.java`: la ventana Android que muestra la página y abre la cámara o la galería.
 - `.github/workflows/compilar-apk.yml`: compila y publica el APK.
 
-La clave de firma (`app/puntuador.jks`) está en el repositorio para que cada versión se pueda instalar encima de la anterior. Mantén el repositorio privado.
+## Actualizaciones
+
+La app comprueba al abrirse si hay una versión nueva en Releases y muestra un aviso. También hay un botón «Buscar actualizaciones» al final de la pantalla. Para que funcione, el repositorio tiene que ser público.
+
+La clave de firma (`app/puntuador.jks`) está en el repositorio para que cada versión se pueda instalar encima de la anterior. La app solo se actualiza desde las versiones publicadas aquí.
