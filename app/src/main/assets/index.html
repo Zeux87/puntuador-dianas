@@ -130,7 +130,7 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
 .notice{background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;font-weight:600}
 /* Navegación y sesiones */
 .tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px}
-.tabs button{flex:1;font:600 .95rem var(--f-body);min-height:40px;border:0;border-radius:7px;background:transparent;color:var(--muted);cursor:pointer}
+.tabs button{flex:1;min-width:0;font:600 .9rem var(--f-body);min-height:40px;padding:0 4px;border:0;border-radius:7px;background:transparent;color:var(--muted);cursor:pointer}
 .tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
 .tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .sesbar{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}
@@ -187,6 +187,32 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
 .tinfo{display:flex;flex-direction:column;gap:6px;min-width:0}
 .tinfo .eyebrow{margin:0}
 .tshots{font-family:var(--f-display);font-weight:500;font-size:1.1rem;margin:0;font-variant-numeric:tabular-nums}
+/* Estadísticas */
+.stfilters{display:flex;flex-direction:column;gap:10px}
+.stfilters .frow{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.stfilters .flbl{font-weight:600;font-size:.82rem;color:var(--muted);min-width:4.5em}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.stempty p{margin:0;color:var(--muted);max-width:65ch}
+.reading{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px;max-width:70ch}
+.reading li{line-height:1.5}
+.reading b{font-weight:600}
+.lv{display:inline-block;font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;font-family:var(--f-body)}
+.lv-baja{background:var(--accent-soft);color:var(--ink)}
+.lv-media{background:var(--warn-soft);color:var(--ink)}
+.lv-alta{background:var(--warn);color:var(--bg)}
+.charts3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:760px){.charts3{grid-template-columns:minmax(0,1fr)}}
+.charts3 .eyebrow{margin:0 0 4px}
+.duo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+@media (max-width:720px){.duo{grid-template-columns:minmax(0,1fr)}}
+.sq{width:100%;max-width:340px;aspect-ratio:1;height:auto;display:block}
+.rings{display:flex;flex-direction:column;gap:6px}
+.rrow{display:grid;grid-template-columns:5.5em minmax(0,1fr) 3em;align-items:center;gap:8px;font-variant-numeric:tabular-nums}
+.rk{font-family:var(--f-display);font-weight:700;font-size:1.05rem}
+.rbar{height:14px;background:var(--bg);border-radius:4px;overflow:hidden}
+.rbar i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.rv{text-align:right;color:var(--muted);font-size:.85rem}
+.demonote{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -215,6 +241,7 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
   <nav class="tabs" role="tablist" aria-label="Secciones">
     <button id="tabScore" type="button" role="tab" aria-selected="true">Puntuar</button>
     <button id="tabSes" type="button" role="tab" aria-selected="false">Sesiones</button>
+    <button id="tabStats" type="button" role="tab" aria-selected="false">Estadísticas</button>
   </nav>
 
   <div id="viewScore">
@@ -396,6 +423,34 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
       <button id="backList" class="btn" type="button" style="align-self:flex-start">← Todas las sesiones</button>
       <div id="detailBody" class="sesview"></div>
     </div>
+  </section>
+
+  <section id="viewStats" class="sesview" aria-label="Estadísticas" hidden>
+    <div id="stDemo" class="notice2 demonote" hidden>
+      <span>Estás viendo datos de ejemplo, no tus sesiones.</span>
+      <button id="stDemoOff" class="btn" type="button">Ocultar el ejemplo</button>
+    </div>
+    <div id="stFilters" class="card stfilters" hidden>
+      <div class="frow">
+        <span class="flbl">Disciplina</span>
+        <span id="stDiscWrap" class="field" hidden><select id="stDisc" aria-label="Disciplina"></select></span>
+        <span id="stDiscOne" class="dmeta" style="margin:0"></span>
+      </div>
+      <div class="frow" id="stTipo" role="group" aria-label="Tipo de sesión">
+        <span class="flbl">Tipo</span>
+        <button class="chip" type="button" data-v="todas">Todas</button>
+        <button class="chip" type="button" data-v="competicion">Competición</button>
+        <button class="chip" type="button" data-v="entreno">Entreno</button>
+      </div>
+      <div class="frow" id="stPer" role="group" aria-label="Periodo">
+        <span class="flbl">Periodo</span>
+        <button class="chip" type="button" data-v="5">Últimas 5</button>
+        <button class="chip" type="button" data-v="10">Últimas 10</button>
+        <button class="chip" type="button" data-v="30">Últimas 30</button>
+        <button class="chip" type="button" data-v="0">Todas</button>
+      </div>
+    </div>
+    <div id="stBody" class="sesview"></div>
   </section>
 </div>
 
@@ -1222,14 +1277,8 @@ function renderResults(){
   drawPlot(info, mpi);
 }
 
-function drawPlot(info, mpi){ drawPlotOn($('plot'), D(), info, mpi, St.sel); }
-function drawPlotOn(cv, d, info, mpi, sel){
-  const css = cv.clientWidth || 300, u = Math.min(2, window.devicePixelRatio || 1), S = Math.round(css * u);
-  if (cv.width !== S){ cv.width = S; cv.height = S; }
-  const x = cv.getContext('2d');
-  x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, S, S);
-  const maxD = info.reduce((a, s) => Math.max(a, s.dist), 0);
-  const E = Math.min(outerR(d) + PELLET + 1, Math.max(d.negro * 1.12, maxD + PELLET + 3));
+// Dibuja la diana (papel, negro, anillos y números) centrada; devuelve píxeles por mm
+function drawTargetBase(x, S, u, d, E){
   const sc = (S / 2) / E;
   x.translate(S / 2, S / 2);
   x.fillStyle = '#e6e8df'; x.beginPath(); x.arc(0, 0, S / 2, 0, Math.PI * 2); x.fill();
@@ -1247,6 +1296,18 @@ function drawPlotOn(cv, d, info, mpi, sel){
     x.fillStyle = rm < d.negro ? '#c9ccc2' : '#3a3e3c';
     x.fillText(String(n), 0, -rm * sc);
   }
+  return sc;
+}
+
+function drawPlot(info, mpi){ drawPlotOn($('plot'), D(), info, mpi, St.sel); }
+function drawPlotOn(cv, d, info, mpi, sel){
+  const css = cv.clientWidth || 300, u = Math.min(2, window.devicePixelRatio || 1), S = Math.round(css * u);
+  if (cv.width !== S){ cv.width = S; cv.height = S; }
+  const x = cv.getContext('2d');
+  x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, S, S);
+  const maxD = info.reduce((a, s) => Math.max(a, s.dist), 0);
+  const E = Math.min(outerR(d) + PELLET + 1, Math.max(d.negro * 1.12, maxD + PELLET + 3));
+  const sc = drawTargetBase(x, S, u, d, E);
   info.forEach((s, i) => {
     const px = s.mx * sc, py = -s.my * sc, r = Math.max(PELLET * sc, 4 * u);
     x.beginPath(); x.arc(px, py, r, 0, Math.PI * 2);
@@ -1374,10 +1435,13 @@ function setTab(tab){
   SV.tab = tab;
   $('tabScore').setAttribute('aria-selected', tab === 'puntuar' ? 'true' : 'false');
   $('tabSes').setAttribute('aria-selected', tab === 'sesiones' ? 'true' : 'false');
+  $('tabStats').setAttribute('aria-selected', tab === 'estadisticas' ? 'true' : 'false');
   $('viewScore').hidden = tab !== 'puntuar';
   $('viewSessions').hidden = tab !== 'sesiones';
+  $('viewStats').hidden = tab !== 'estadisticas';
   if (tab === 'puntuar'){ render(); renderResults(); syncControls(); }
-  else renderSessions();
+  else if (tab === 'sesiones') renderSessions();
+  else renderStats();
   try { window.scrollTo(0, 0); } catch (_) {}
 }
 
@@ -1750,6 +1814,7 @@ function initSessions(){
   $('openSes').addEventListener('click', () => { SV.detailId = St.session?.id || null; SV.openTarget = null; setTab('sesiones'); });
   // Botón atrás de Android: vuelve a la vista anterior antes de salir de la app
   window.onAndroidBack = () => {
+    if (SV.tab === 'estadisticas'){ setTab('puntuar'); return true; }
     if (SV.tab === 'sesiones'){
       if (SV.openTarget){ SV.openTarget = null; renderDetail(); return true; }
       if (SV.detailId){ SV.detailId = null; renderSessions(); return true; }
@@ -1760,6 +1825,422 @@ function initSessions(){
   };
   const act = Store.get('activa');
   if (act){ const s = Ses.load(act); if (s && !s.terminada){ St.session = s; St.disc = s.disc; } else Store.del('activa'); }
+}
+
+/* ===================== Estadísticas ===================== */
+const STV = { disc:null, tipo:'todas', periodo:10, demo:false };
+
+const mean = a => a.length ? a.reduce((p, q) => p + q, 0) / a.length : 0;
+// Nivel de deriva según el ancho de anillo de la disciplina
+function driftLevel(d, mm){ const r = mm / d.w; return r < 0.25 ? 'baja' : r < 0.6 ? 'media' : 'alta'; }
+function dirText(x, y){
+  const h = Math.abs(x) < 0.3 ? '' : `${fmt1(Math.abs(x))} mm a la ${x < 0 ? 'izquierda' : 'derecha'}`;
+  const v = Math.abs(y) < 0.3 ? '' : `${fmt1(Math.abs(y))} mm ${y < 0 ? 'abajo' : 'arriba'}`;
+  return [h, v].filter(Boolean).join(' y ') || 'centrado';
+}
+
+function allSessions(){
+  if (STV.demo) return demoSessions();
+  return Ses.index().map(e => (St.session && St.session.id === e.id) ? St.session : Ses.load(e.id)).filter(Boolean);
+}
+
+// Sesiones de ejemplo: un tirador de pistola que va mejorando, con deriva hacia las 7-8
+function demoSessions(){
+  const r = rng(2026);
+  const gauss = () => { let a = 0; while (!a) a = r(); return Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * r()); };
+  const d = DISC.pistola, out = [], now = Date.now(), K = 14;
+  for (let k = 0; k < K; k++){
+    const comp = k % 3 === 2, nd = comp ? 12 : 6, pd = 5, prog = k / (K - 1);
+    const sx = 9.6 - 2.4 * prog, sy = 12.2 - 3.4 * prog;
+    const bx = -2.8 + 1.2 * prog + gauss() * 0.9, by = -3.4 + 1.6 * prog + gauss() * 0.9;
+    const targets = [];
+    for (let t = 0; t < nd; t++){
+      const f = 1 + (comp ? t * 0.025 : 0);
+      const shots = [];
+      for (let i = 0; i < pd; i++){
+        const x = bx + gauss() * sx * f, y = by + gauss() * sy * f, sc = scoreOf(d, Math.hypot(x, y));
+        shots.push({ x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100, dec: sc.dec, int: sc.int, x10: sc.x });
+      }
+      targets.push({ id: `ej${k}_${t}`, n: t + 1, fecha: '', shots, ...totalsOf(shots), grupo: round1(groupOf(shots)) });
+    }
+    const fecha = new Date(now - (K - 1 - k) * 4 * 86400000).toISOString();
+    out.push({ id: 'ej' + k, nombre: comp ? `Liga · jornada ${Math.floor(k / 3) + 1}` : 'Entreno en el club', tipo: comp ? 'competicion' : 'entreno',
+               disc: 'pistola', dianas: nd, porDiana: pd, creada: fecha, terminada: fecha, targets });
+  }
+  return out.reverse();
+}
+
+function computeStats(list, d){
+  const ses = [], all = [];
+  let sxx = 0, syy = 0, dof = 0, rSum = 0, rN = 0;
+  for (const s of list){
+    const ss = s.targets.flatMap(t => t.shots);
+    if (!ss.length) continue;
+    const mx = mean(ss.map(p => p.x)), my = mean(ss.map(p => p.y));
+    const tg = s.targets.filter(t => t.shots.length >= 2);
+    let rs = 0, rn = 0;
+    for (const t of tg){
+      const tx = mean(t.shots.map(p => p.x)), ty = mean(t.shots.map(p => p.y));
+      for (const p of t.shots){ rs += Math.hypot(p.x - tx, p.y - ty); rn++; sxx += (p.x - tx) ** 2; syy += (p.y - ty) ** 2; }
+      dof += t.shots.length - 1;
+    }
+    rSum += rs; rN += rn;
+    ses.push({ s, n: ss.length, media: mean(ss.map(p => p.dec)), mediaInt: mean(ss.map(p => p.int)),
+               mx, my, deriva: Math.hypot(mx, my), diam: tg.length ? mean(tg.map(t => groupOf(t.shots))) : null,
+               rmed: rn ? rs / rn : null });
+    all.push(...ss);
+  }
+  if (!all.length) return null;
+  ses.sort((a, b) => a.s.creada.localeCompare(b.s.creada));
+  const N = all.length;
+  const st = { d, ses, all, N,
+    media: mean(all.map(p => p.dec)), mediaInt: mean(all.map(p => p.int)),
+    mx: mean(all.map(p => p.x)), my: mean(all.map(p => p.y)),
+    sdx: dof ? Math.sqrt(sxx / dof) : null, sdy: dof ? Math.sqrt(syy / dof) : null,
+    rmed: rN ? rSum / rN : null };
+  const conD = ses.filter(e => e.diam != null);
+  st.diam = conD.length ? mean(conD.map(e => e.diam)) : null;
+  st.deriva = mean(ses.map(e => e.deriva));
+  // Constancia de la dirección: 1 = siempre hacia el mismo lado, 0 = cada vez hacia un lado
+  const dir = ses.filter(e => e.deriva > 0.2);
+  if (dir.length){
+    const ux = mean(dir.map(e => e.mx / e.deriva)), uy = mean(dir.map(e => e.my / e.deriva));
+    st.constancia = dir.length >= 3 ? Math.hypot(ux, uy) : null;
+    st.dirX = ux; st.dirY = uy;
+  }
+  st.nivel = driftLevel(d, st.deriva);
+  // Reparto por anillos
+  st.anillos = {}; for (let v = 0; v <= 10; v++) st.anillos[v] = 0;
+  for (const p of all) st.anillos[p.int]++;
+  st.xs = all.filter(p => p.x10).length;
+  // Media según la posición de la diana dentro de la sesión
+  const pos = [];
+  for (const e of ses) e.s.targets.forEach((t, i) => {
+    if (!t.shots.length) return;
+    (pos[i] = pos[i] || []).push(mean(t.shots.map(p => p.dec)));
+  });
+  st.pos = pos.map((v, i) => ({ i, n: v ? v.length : 0, v: v ? mean(v) : null })).filter(e => e.n >= 2);
+  // Comparación: mitad reciente frente a mitad anterior
+  if (ses.length >= 4){
+    const h = Math.floor(ses.length / 2), A = ses.slice(0, h), B = ses.slice(ses.length - h);
+    const dm = l => { const c = l.filter(e => e.diam != null); return c.length ? mean(c.map(e => e.diam)) : null; };
+    st.cmp = { k: h, media: mean(B.map(e => e.media)) - mean(A.map(e => e.media)),
+               diamA: dm(A), diamB: dm(B), derA: mean(A.map(e => e.deriva)), derB: mean(B.map(e => e.deriva)) };
+  }
+  // Récords
+  st.bestSes = ses.filter(e => e.n >= 10).reduce((a, e) => !a || e.media > a.media ? e : a, null);
+  let bestT = null, minG = null;
+  for (const e of ses) for (const t of e.s.targets){
+    if (!t.shots.length) continue;
+    const m = mean(t.shots.map(p => p.dec));
+    if (t.shots.length >= e.s.porDiana && (!bestT || m > bestT.m)) bestT = { t, s: e.s, m };
+    if (t.shots.length >= 3 && t.shots.length >= e.s.porDiana){ const g = groupOf(t.shots); if (!minG || g < minG.g) minG = { t, s: e.s, g }; }
+  }
+  st.bestT = bestT; st.minG = minG;
+  return st;
+}
+
+/* ----- Textos de lectura ----- */
+function statsReading(st){
+  const d = st.d, out = [];
+  const ns = st.ses.length;
+  out.push(`En ${ns === 1 ? '1 sesión' : ns + ' sesiones'} (${st.N} impactos) haces <b>${fmt1(st.media)} de media por impacto</b>, unos ${Math.round(st.mediaInt * 60)} puntos sobre 600.`);
+  if (st.cmp){
+    const c = st.cmp, partes = [];
+    if (Math.abs(c.media) >= 0.05) partes.push(`tu media ${c.media > 0 ? 'sube' : 'baja'} ${fmt1(Math.abs(c.media))} por impacto`);
+    else partes.push('tu media se mantiene');
+    if (c.diamA && c.diamB){
+      const pct = Math.round((c.diamB - c.diamA) / c.diamA * 100);
+      partes.push(Math.abs(pct) < 3 ? 'la agrupación no cambia' : `la agrupación ${pct < 0 ? 'mejora' : 'empeora'} un ${Math.abs(pct)} %`);
+    }
+    out.push(`En tus ${c.k} sesiones más recientes, comparadas con las ${c.k} anteriores, ${partes.join(' y ')}.`);
+  }
+  const lv = st.nivel;
+  if (st.deriva < 0.3) out.push('Tus impactos se reparten alrededor del centro, sin deriva apreciable.');
+  else {
+    let t = `Tu punto medio se desvía de media <b>${fmt1(st.deriva)} mm</b>: deriva <b>${lv}</b> para ${d.nombre.toLowerCase()}.`;
+    if (st.constancia != null){
+      const h = clockOf(st.dirX, st.dirY);
+      if (st.constancia >= 0.75) t += ` Casi siempre se va hacia las ${h}.`;
+      else if (st.constancia >= 0.45) t += ` Suele irse hacia las ${h}, aunque no siempre.`;
+      else t += ' No se va siempre hacia el mismo lado: cambia de una sesión a otra.';
+    } else if (st.ses.length) t += ` En estas sesiones se va hacia las ${clockOf(st.mx, st.my)}.`;
+    out.push(t);
+  }
+  if (st.sdx && st.sdy){
+    const r = st.sdy / st.sdx;
+    if (r > 1.2) out.push(`Dispersas más en vertical que en horizontal (${fmt1(st.sdy)} mm frente a ${fmt1(st.sdx)} mm de desviación típica).`);
+    else if (r < 1 / 1.2) out.push(`Dispersas más en horizontal que en vertical (${fmt1(st.sdx)} mm frente a ${fmt1(st.sdy)} mm de desviación típica).`);
+    else out.push(`La dispersión es pareja en horizontal y vertical (unos ${fmt1((st.sdx + st.sdy) / 2)} mm de desviación típica).`);
+  }
+  if (st.pos.length >= 4){
+    const a = mean(st.pos.slice(0, 2).map(e => e.v)), b = mean(st.pos.slice(-2).map(e => e.v));
+    if (b - a <= -0.15) out.push(`Las últimas dianas de la sesión te salen peor que las primeras (${fmt1(b)} frente a ${fmt1(a)} por impacto).`);
+    else if (b - a >= 0.15) out.push(`Vas a más dentro de la sesión: las últimas dianas te salen mejor que las primeras (${fmt1(b)} frente a ${fmt1(a)}).`);
+  }
+  return out;
+}
+
+/* ----- Gráficas de estadísticas ----- */
+function drawSeries(cv, pts, o = {}){
+  const { x, W, H, u } = prepCanvas(cv, o.h || 130);
+  const muted = cssVar('--muted'), line = cssVar('--line'), acc = cssVar('--accent'), ink = cssVar('--ink');
+  const f = o.fmt || fmt1;
+  const padL = 38 * u, padB = 20 * u, padT = 12 * u, pw = W - padL - 10 * u, ph = H - padB - padT;
+  const vs = pts.map(p => p.v);
+  let lo = Math.min(...vs), hi = Math.max(...vs);
+  const span = Math.max(hi - lo, o.minSpan || 0.5);
+  lo = lo - span * 0.15; hi = hi + span * 0.15;
+  if (o.floor != null) lo = Math.max(o.floor, lo);
+  if (o.ceil != null) hi = Math.min(o.ceil, hi);
+  const yy = v => padT + ph - (v - lo) / (hi - lo || 1) * ph;
+  const n = pts.length, bw = pw / n;
+  const xx = i => o.bar ? padL + (i + 0.5) * bw : padL + (n === 1 ? pw / 2 : i / (n - 1) * pw);
+  x.font = `${10 * u}px "Public Sans", sans-serif`; x.fillStyle = muted; x.textAlign = 'right'; x.textBaseline = 'middle';
+  x.strokeStyle = line; x.lineWidth = 1;
+  for (const v of [lo, (lo + hi) / 2, hi]){ x.beginPath(); x.moveTo(padL, yy(v)); x.lineTo(W, yy(v)); x.stroke(); x.fillText(f(v), padL - 5 * u, yy(v)); }
+  x.textAlign = 'center'; x.textBaseline = 'top';
+  if (o.bar){
+    pts.forEach((p, i) => {
+      x.fillStyle = acc; const top = yy(p.v);
+      x.fillRect(xx(i) - bw * 0.32, top, bw * 0.64, padT + ph - top);
+      if (n <= 15 || i % 2 === 0){ x.fillStyle = muted; x.fillText(p.label, xx(i), padT + ph + 5 * u); }
+    });
+    return;
+  }
+  x.fillText(pts[0].label, Math.max(padL + 16 * u, xx(0)), padT + ph + 5 * u);
+  if (n > 1) x.fillText(pts[n - 1].label, Math.min(W - 16 * u, xx(n - 1)), padT + ph + 5 * u);
+  // Área bajo la línea
+  if (n > 1){
+    x.beginPath(); x.moveTo(xx(0), padT + ph);
+    pts.forEach((p, i) => x.lineTo(xx(i), yy(p.v)));
+    x.lineTo(xx(n - 1), padT + ph); x.closePath();
+    x.globalAlpha = 0.12; x.fillStyle = acc; x.fill(); x.globalAlpha = 1;
+  }
+  x.strokeStyle = acc; x.lineWidth = 2 * u; x.lineJoin = 'round'; x.beginPath();
+  pts.forEach((p, i) => i ? x.lineTo(xx(i), yy(p.v)) : x.moveTo(xx(i), yy(p.v))); x.stroke();
+  pts.forEach((p, i) => {
+    const last = i === n - 1;
+    x.beginPath(); x.arc(xx(i), yy(p.v), (last ? 4.5 : 2.6) * u, 0, Math.PI * 2);
+    x.fillStyle = last ? ink : acc; x.fill();
+  });
+  x.fillStyle = ink; x.font = `700 ${12 * u}px "Saira Condensed", sans-serif`;
+  x.textAlign = n > 1 ? 'right' : 'center'; x.textBaseline = 'bottom';
+  x.fillText(f(pts[n - 1].v), xx(n - 1) - (n > 1 ? 7 * u : 0), yy(pts[n - 1].v) - 6 * u);
+}
+
+// Deriva: punto medio de cada sesión alrededor del centro, con las zonas baja, media y alta
+function drawDrift(cv, st){
+  const css = cv.clientWidth || 300, u = Math.min(2, window.devicePixelRatio || 1), S = Math.round(css * u);
+  cv.width = S; cv.height = S;
+  const x = cv.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, S, S);
+  const d = st.d, muted = cssVar('--muted'), line = cssVar('--line'), ink = cssVar('--ink'), acc = cssVar('--accent'),
+        warn = cssVar('--warn'), surf = cssVar('--bg');
+  const maxM = Math.max(...st.ses.map(e => e.deriva), st.deriva);
+  const E = Math.max(maxM * 1.3, d.w * 0.75);
+  const sc = (S / 2 - 16 * u) / E;
+  x.translate(S / 2, S / 2);
+  const zones = [[E, 0.16], [d.w * 0.6, 0.09], [d.w * 0.25, 0]];
+  for (const [r, a] of zones){
+    x.beginPath(); x.arc(0, 0, Math.min(r, E) * sc, 0, Math.PI * 2);
+    x.fillStyle = surf; x.fill();
+    if (a){ x.globalAlpha = a; x.fillStyle = warn; x.fill(); x.globalAlpha = 1; }
+    x.strokeStyle = line; x.lineWidth = 1 * u; x.stroke();
+  }
+  x.strokeStyle = line; x.lineWidth = 1;
+  x.beginPath(); x.moveTo(-E * sc, 0); x.lineTo(E * sc, 0); x.moveTo(0, -E * sc); x.lineTo(0, E * sc); x.stroke();
+  x.font = `600 ${10 * u}px "Public Sans", sans-serif`; x.fillStyle = muted; x.textAlign = 'left'; x.textBaseline = 'bottom';
+  const lbl = (r, t) => { if (r < E) x.fillText(t, r * sc * 0.7071 + 3 * u, -r * sc * 0.7071 - 2 * u); };
+  lbl(d.w * 0.25, 'baja'); lbl(d.w * 0.6, 'media');
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  const R = E * sc + 9 * u;
+  x.fillText('12', 0, -R + 2 * u); x.fillText('6', 0, R - 2 * u); x.fillText('3', R - 3 * u, 0); x.fillText('9', -R + 3 * u, 0);
+  const n = st.ses.length;
+  st.ses.forEach((e, i) => {
+    const px = e.mx * sc, py = -e.my * sc;
+    x.globalAlpha = 0.35 + 0.65 * (n === 1 ? 1 : i / (n - 1));
+    x.beginPath(); x.arc(px, py, 4.2 * u, 0, Math.PI * 2); x.fillStyle = acc; x.fill();
+    x.globalAlpha = 1;
+  });
+  // Media de las sesiones
+  const mx = mean(st.ses.map(e => e.mx)), my = mean(st.ses.map(e => e.my));
+  const a = 8 * u, px = mx * sc, py = -my * sc;
+  x.strokeStyle = '#ff8a1f'; x.lineWidth = 2.6 * u;
+  x.beginPath(); x.moveTo(px - a, py); x.lineTo(px + a, py); x.moveTo(px, py - a); x.lineTo(px, py + a); x.stroke();
+  x.beginPath(); x.arc(0, 0, 2 * u, 0, Math.PI * 2); x.fillStyle = ink; x.fill();
+}
+
+// Nube de todos los impactos con su punto medio y la elipse donde caen casi 9 de cada 10
+function drawCloud(cv, st){
+  const css = cv.clientWidth || 300, u = Math.min(2, window.devicePixelRatio || 1), S = Math.round(css * u);
+  cv.width = S; cv.height = S;
+  const x = cv.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, S, S);
+  const d = st.d, dists = st.all.map(p => Math.hypot(p.x, p.y)).sort((p, q) => p - q);
+  const p95 = dists[Math.floor(dists.length * 0.95)] || dists[dists.length - 1];
+  const E = Math.min(outerR(d) + PELLET + 1, Math.max(d.negro * 1.12, p95 + PELLET + 3));
+  const sc = drawTargetBase(x, S, u, d, E);
+  const r = Math.max(PELLET * sc * 0.75, 2.6 * u), alpha = st.N > 300 ? 0.35 : st.N > 100 ? 0.5 : 0.7;
+  x.fillStyle = `rgba(22,205,225,${alpha})`;
+  for (const p of st.all){
+    if (Math.hypot(p.x, p.y) > E) continue;
+    x.beginPath(); x.arc(p.x * sc, -p.y * sc, r, 0, Math.PI * 2); x.fill();
+  }
+  // Elipse de 2 desviaciones típicas (≈ 86 % de los impactos)
+  if (st.N >= 5){
+    let cxx = 0, cyy = 0, cxy = 0;
+    for (const p of st.all){ const dx = p.x - st.mx, dy = -(p.y - st.my); cxx += dx * dx; cyy += dy * dy; cxy += dx * dy; }
+    cxx /= st.N - 1; cyy /= st.N - 1; cxy /= st.N - 1;
+    const tr = cxx + cyy, det = cxx * cyy - cxy * cxy, disc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+    const l1 = tr / 2 + disc, l2 = Math.max(0, tr / 2 - disc), th = 0.5 * Math.atan2(2 * cxy, cxx - cyy);
+    x.save(); x.setLineDash([6 * u, 4 * u]); x.strokeStyle = '#ff8a1f'; x.lineWidth = 2 * u;
+    x.beginPath(); x.ellipse(st.mx * sc, -st.my * sc, 2 * Math.sqrt(l1) * sc, 2 * Math.sqrt(l2) * sc, th, 0, Math.PI * 2); x.stroke();
+    x.restore();
+  }
+  const a = 8 * u, px = st.mx * sc, py = -st.my * sc;
+  x.strokeStyle = '#ff8a1f'; x.lineWidth = 2.6 * u;
+  x.beginPath(); x.moveTo(px - a, py); x.lineTo(px + a, py); x.moveTo(px, py - a); x.lineTo(px, py + a); x.stroke();
+}
+
+/* ----- Pantalla ----- */
+function renderStats(){
+  const todas = allSessions();
+  const conDatos = todas.filter(s => s.targets.some(t => t.shots.length));
+  const body = $('stBody');
+  $('stDemo').hidden = !STV.demo;
+  $('stDemoOff').textContent = 'Ocultar el ejemplo';
+  if (!conDatos.length){
+    $('stFilters').hidden = true;
+    body.innerHTML = `<div class="card stempty">
+      <h2>Aún no hay datos</h2>
+      <p>Las estadísticas salen de las dianas que guardas en tus sesiones. Cuando tengas alguna, aquí verás tu media, el diámetro de tus agrupaciones, hacia dónde se te van los tiros y cómo evolucionas.</p>
+      <div class="row">
+        <button class="btn primary" type="button" id="stGoNew">Crear una sesión</button>
+        <button class="btn" type="button" id="stDemoOn">Ver con datos de ejemplo</button>
+      </div></div>`;
+    $('stGoNew').addEventListener('click', () => { SV.detailId = null; SV.formOpen = true; $('fDisc').value = St.disc; setTab('sesiones'); });
+    $('stDemoOn').addEventListener('click', () => { STV.demo = true; STV.disc = null; renderStats(); });
+    return;
+  }
+  $('stFilters').hidden = false;
+  // Disciplinas con datos; por defecto la más usada
+  const cuenta = {};
+  for (const s of conDatos) cuenta[s.disc] = (cuenta[s.disc] || 0) + s.targets.reduce((a, t) => a + t.shots.length, 0);
+  const discs = Object.keys(cuenta).sort((a, b) => cuenta[b] - cuenta[a]);
+  if (!STV.disc || !cuenta[STV.disc]) STV.disc = discs[0];
+  const sel = $('stDisc');
+  sel.innerHTML = discs.map(k => `<option value="${k}">${esc(DISC[k].nombre)}</option>`).join('');
+  sel.value = STV.disc;
+  $('stDiscWrap').hidden = discs.length < 2;
+  $('stDiscOne').hidden = discs.length >= 2;
+  $('stDiscOne').textContent = DISC[STV.disc].nombre;
+  document.querySelectorAll('#stTipo [data-v]').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === STV.tipo ? 'true' : 'false'));
+  document.querySelectorAll('#stPer [data-v]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.v === STV.periodo ? 'true' : 'false'));
+
+  let lista = conDatos.filter(s => s.disc === STV.disc && (STV.tipo === 'todas' || s.tipo === STV.tipo));
+  lista.sort((a, b) => b.creada.localeCompare(a.creada));
+  if (STV.periodo) lista = lista.slice(0, STV.periodo);
+  const d = DISC[STV.disc], st = computeStats(lista, d);
+  if (!st){
+    body.innerHTML = `<div class="card stempty"><h2>Sin datos con estos filtros</h2><p>No hay ${STV.tipo === 'competicion' ? 'competiciones' : 'entrenamientos'} guardados en ${esc(d.nombre.toLowerCase())}. Cambia el filtro de tipo.</p></div>`;
+    return;
+  }
+  const lv = st.nivel;
+  const constTxt = st.constancia == null ? 'Hacen falta 3 sesiones' : st.constancia >= 0.75 ? 'Muy constante' : st.constancia >= 0.45 ? 'Bastante constante' : 'Variable';
+  const dirH = st.constancia != null ? clockOf(st.dirX, st.dirY) : clockOf(st.mx, st.my);
+  const hv = st.sdx && st.sdy ? (st.sdy / st.sdx > 1.2 ? 'Más vertical' : st.sdx / st.sdy > 1.2 ? 'Más horizontal' : 'Pareja') : '–';
+  const ringsMax = Math.max(...Object.values(st.anillos));
+  const ringRows = [10, 9, 8, 7, 6, 5].map(v => {
+    const c = v === 5 ? Object.entries(st.anillos).filter(([k]) => +k <= 5).reduce((a, [, n]) => a + n, 0) : st.anillos[v];
+    const pct = c / st.N * 100;
+    return `<div class="rrow"><span class="rk">${v === 5 ? '≤ 5' : v}</span><span class="rbar"><i style="width:${Math.max(pct ? 2 : 0, c / Math.max(ringsMax, 1) * 100)}%"></i></span><span class="rv">${Math.round(pct)} %</span></div>`;
+  }).join('');
+  const per = STV.periodo ? `tus últimas ${st.ses.length} sesiones` : `tus ${st.ses.length} sesiones`;
+
+  body.innerHTML = `
+    <div class="card">
+      <div><p class="eyebrow">Lectura · ${esc(d.nombre)} · ${per}</p></div>
+      <ul class="reading">${statsReading(st).map(t => `<li>${t}</li>`).join('')}</ul>
+    </div>
+
+    <div class="card">
+      <dl class="facts f8">
+        <div><dt>Media por impacto</dt><dd>${fmt1(st.media)}<small>≈ ${Math.round(st.mediaInt * 60)} / 600</small></dd></div>
+        <div><dt>Diámetro medio</dt><dd>${st.diam != null ? fmt1(st.diam) + ' mm' : '–'}<small>agrupación por diana, centro a centro</small></dd></div>
+        <div><dt>Radio medio</dt><dd>${st.rmed != null ? fmt1(st.rmed) + ' mm' : '–'}<small>de cada impacto a su punto medio</small></dd></div>
+        <div><dt>Deriva media</dt><dd>${fmt1(st.deriva)} mm<small><span class="lv lv-${lv}">${lv}</span></small></dd></div>
+        <div><dt>Dirección</dt><dd>${st.deriva < 0.3 ? 'Centrada' : 'A las ' + dirH}<small>${constTxt}</small></dd></div>
+        <div><dt>Dispersión</dt><dd>${hv}<small>${st.sdx ? 'H ' + fmt1(st.sdx) + ' · V ' + fmt1(st.sdy) + ' mm' : ''}</small></dd></div>
+        <div><dt>Punto medio global</dt><dd>${fmt1(Math.hypot(st.mx, st.my))} mm<small>${dirText(st.mx, st.my)}</small></dd></div>
+        <div><dt>Datos</dt><dd>${st.N}<small>impactos en ${st.ses.length} ${st.ses.length === 1 ? 'sesión' : 'sesiones'}</small></dd></div>
+      </dl>
+    </div>
+
+    ${st.ses.length >= 2 ? `
+    <div class="card">
+      <h2>Evolución por sesión</h2>
+      <div class="charts3">
+        <div><p class="eyebrow">Media por impacto</p><canvas id="chMedia" class="chart"></canvas></div>
+        <div><p class="eyebrow">Diámetro medio (mm)</p><canvas id="chDiam" class="chart"></canvas></div>
+        <div><p class="eyebrow">Deriva (mm)</p><canvas id="chDer" class="chart"></canvas></div>
+      </div>
+      <p class="dmeta">En diámetro y deriva, cuanto más bajo, mejor.</p>
+    </div>` : ''}
+
+    <div class="duo">
+      <div class="card">
+        <h2>Deriva de cada sesión</h2>
+        <div class="plotbox"><canvas id="chDrift" class="sq" aria-label="Punto medio de cada sesión respecto al centro"></canvas></div>
+        <div class="legend"><span><i style="background:var(--accent)"></i>Sesión (más oscuro, más reciente)</span><span><i style="background:#ff8a1f"></i>Media</span></div>
+        <p class="dmeta">Cada punto es el punto medio de los impactos de una sesión. Zonas: baja hasta ${fmt1(d.w * 0.25)} mm, media hasta ${fmt1(d.w * 0.6)} mm.</p>
+      </div>
+      <div class="card">
+        <h2>Todos los impactos</h2>
+        <div class="plotbox"><canvas id="chCloud" class="sq" aria-label="Todos los impactos del periodo"></canvas></div>
+        <div class="legend"><span><i style="background:#16cde1"></i>Impacto</span><span><i style="background:#ff8a1f"></i>Punto medio y zona del 86 %</span></div>
+      </div>
+    </div>
+
+    <div class="duo">
+      <div class="card">
+        <h2>Reparto por anillos</h2>
+        <div class="rings">${ringRows}</div>
+        ${d.x != null ? `<p class="dmeta">${st.xs} dieces interiores (${Math.round(st.xs / st.N * 100)} % de los impactos).</p>` : ''}
+      </div>
+      ${st.pos.length >= 3 ? `
+      <div class="card">
+        <h2>A lo largo de la sesión</h2>
+        <canvas id="chPos" class="chart" aria-label="Media por impacto según el número de diana"></canvas>
+        <p class="dmeta">Media por impacto según el número de diana dentro de la sesión.</p>
+      </div>` : ''}
+    </div>
+
+    <div class="card">
+      <h2>Mejores marcas</h2>
+      <dl class="facts">
+        <div><dt>Mejor sesión</dt><dd>${st.bestSes ? fmt1(st.bestSes.media) : '–'}<small>${st.bestSes ? esc(st.bestSes.s.nombre) + ' · ' + fechaCorta(st.bestSes.s.creada) : 'con 10 impactos o más'}</small></dd></div>
+        <div><dt>Mejor diana</dt><dd>${st.bestT ? st.bestT.t.total : '–'}<small>${st.bestT ? 'Diana ' + st.bestT.t.n + ' · ' + esc(st.bestT.s.nombre) : ''}</small></dd></div>
+        <div><dt>Agrupación más cerrada</dt><dd>${st.minG ? fmt1(st.minG.g) + ' mm' : '–'}<small>${st.minG ? 'Diana ' + st.minG.t.n + ' · ' + fechaCorta(st.minG.s.creada) : 'dianas de 3 impactos o más'}</small></dd></div>
+      </dl>
+    </div>`;
+
+  const lab = e => fechaCorta(e.s.creada).slice(0, 5);
+  if (st.ses.length >= 2){
+    drawSeries($('chMedia'), st.ses.map(e => ({ v: e.media, label: lab(e) })), { minSpan: 0.4, ceil: 10.9 });
+    const cd = st.ses.filter(e => e.diam != null);
+    if (cd.length >= 2) drawSeries($('chDiam'), cd.map(e => ({ v: e.diam, label: lab(e) })), { minSpan: 4, floor: 0, fmt: v => String(Math.round(v)) });
+    drawSeries($('chDer'), st.ses.map(e => ({ v: e.deriva, label: lab(e) })), { minSpan: 1, floor: 0 });
+  }
+  drawDrift($('chDrift'), st);
+  drawCloud($('chCloud'), st);
+  if (st.pos.length >= 3) drawSeries($('chPos'), st.pos.map(e => ({ v: e.v, label: String(e.i + 1) })), { bar: true, minSpan: 0.4, h: 150 });
+}
+
+function initStats(){
+  $('tabStats').addEventListener('click', () => setTab('estadisticas'));
+  $('stDisc').addEventListener('change', e => { STV.disc = e.target.value; renderStats(); });
+  document.querySelectorAll('#stTipo [data-v]').forEach(b => b.addEventListener('click', () => { STV.tipo = b.dataset.v; renderStats(); }));
+  document.querySelectorAll('#stPer [data-v]').forEach(b => b.addEventListener('click', () => { STV.periodo = +b.dataset.v; renderStats(); }));
+  $('stDemoOff').addEventListener('click', () => { STV.demo = false; STV.disc = null; renderStats(); });
 }
 
 /* ===================== Actualizaciones (solo dentro de la app Android) ===================== */
@@ -1804,6 +2285,7 @@ function init(){
   restore();
   initUpdates();
   initSessions();
+  initStats();
   $('disc').value = St.disc; $('sens').value = St.sens; $('sensOut').textContent = St.sens;
   const cv = $('view');
   cv.addEventListener('pointerdown', onDown);
@@ -1832,6 +2314,8 @@ function init(){
       St.shots.splice(St.sel, 1); St.sel = -1; update();
     }
   });
+  let rsT = null;
+  window.addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => { if (SV.tab === 'estadisticas') renderStats(); else if (SV.tab === 'sesiones') renderSessions(); }, 200); });
   if (typeof ResizeObserver !== 'undefined'){
     let last = 0;
     new ResizeObserver(() => { const w = $('cwrap').clientWidth; if (w !== last){ last = w; render(); drawPlot(St.cal ? St.shots.map(shotInfo) : [], null); renderResults(); } }).observe($('cwrap'));
