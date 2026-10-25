@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Versión de un solo color para los iconos temáticos de Android 13 o superior -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- La U, recortada donde va la diana (el círculo va en sentido contrario y hace de hueco) -->
+    <group>
+        <clip-path android:pathData="M0,0 H108 V108 H0 Z M38.3,49.371 a15.7,15.7 0 1,0 31.4,0 a15.7,15.7 0 1,0 -31.4,0 Z" />
+        <path android:pathData="M32.302,31.0 L41.849,31.0 L41.849,67.742 L66.151,67.742 L66.151,31.0 L75.698,31.0 L75.698,77.0 L32.302,77.0 Z" android:fillColor="#FFFFFFFF" />
+    </group>
+    <path android:pathData="M39.5,49.371 a14.5,14.5 0 1,0 29.0,0 a14.5,14.5 0 1,0 -29.0,0 Z" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.4" />
+    <path android:pathData="M44.4,49.371 a9.6,9.6 0 1,0 19.2,0 a9.6,9.6 0 1,0 -19.2,0 Z" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.6" />
+    <path android:pathData="M49.725,48.801 a1.805,1.805 0 1,0 3.61,0 a1.805,1.805 0 1,0 -3.61,0 Z M55.045,45.951 a1.995,1.995 0 1,0 3.99,0 a1.995,1.995 0 1,0 -3.99,0 Z M49.06,52.601 a1.71,1.71 0 1,0 3.42,0 a1.71,1.71 0 1,0 -3.42,0 Z M53.145,52.221 a1.995,1.995 0 1,0 3.99,0 a1.995,1.995 0 1,0 -3.99,0 Z" android:fillColor="#FFFFFFFF" />
+</vector>

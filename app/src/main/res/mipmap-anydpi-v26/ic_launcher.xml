@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/icono_fondo" />
+    <background android:drawable="@drawable/ic_fondo" />
     <foreground android:drawable="@drawable/ic_diana" />
+    <monochrome android:drawable="@drawable/ic_mono" />
 </adaptive-icon>
