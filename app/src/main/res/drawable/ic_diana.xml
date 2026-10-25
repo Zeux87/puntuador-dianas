@@ -1,41 +1,58 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Icono: la U de Línea de Tiro enmarca una diana con impactos dorados -->
+<!-- Icono: imagen de puntería. El alza y el guión son el logo de Línea de Tiro
+     (dos L enfrentadas y una T invertida) y el negro de la diana se apoya sobre el guión. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Alza: las dos L -->
     <path
-        android:pathData="M32.302,31.0 L41.849,31.0 L41.849,67.742 L66.151,67.742 L66.151,31.0 L75.698,31.0 L75.698,77.0 L32.302,77.0 Z"
+        android:pathData="M37.491,47.0 L44.755,47.0 L44.755,74.956 L63.245,74.956 L63.245,47.0 L70.509,47.0 L70.509,82.0 L37.491,82.0 Z"
         android:strokeColor="#FF2B2F33"
-        android:strokeWidth="1.1"
+        android:strokeWidth="1"
         android:strokeLineJoin="round">
         <aapt:attr name="android:fillColor">
-            <gradient android:type="linear" android:startX="0" android:startY="31.0" android:endX="0" android:endY="77.0">
+            <gradient android:type="linear" android:startX="0" android:startY="47.0" android:endX="0" android:endY="82.0">
                 <item android:offset="0" android:color="#FFF4F5F6" />
                 <item android:offset="1" android:color="#FF9DA1A6" />
             </gradient>
         </aapt:attr>
     </path>
+    <!-- Guión: la T invertida, en dorado -->
     <path
-        android:pathData="M39.5,49.371 a14.5,14.5 0 1,0 29.0,0 a14.5,14.5 0 1,0 -29.0,0 Z"
-        android:fillColor="#FF0B0D0F"
-        android:strokeWidth="2.4">
-        <aapt:attr name="android:strokeColor">
-            <gradient android:type="linear" android:startX="0" android:startY="34.871" android:endX="0" android:endY="63.871">
-                <item android:offset="0" android:color="#FFF4F5F6" />
-                <item android:offset="1" android:color="#FF9DA1A6" />
-            </gradient>
-        </aapt:attr>
-    </path>
-    <path
-        android:pathData="M44.4,49.371 a9.6,9.6 0 1,0 19.2,0 a9.6,9.6 0 1,0 -19.2,0 Z"
-        android:strokeColor="#FFD9DCDF"
-        android:strokeWidth="1.6" />
-    <path
-        android:pathData="M49.725,48.801 a1.805,1.805 0 1,0 3.61,0 a1.805,1.805 0 1,0 -3.61,0 Z M55.045,45.951 a1.995,1.995 0 1,0 3.99,0 a1.995,1.995 0 1,0 -3.99,0 Z M49.06,52.601 a1.71,1.71 0 1,0 3.42,0 a1.71,1.71 0 1,0 -3.42,0 Z M53.145,52.221 a1.995,1.995 0 1,0 3.99,0 a1.995,1.995 0 1,0 -3.99,0 Z">
+        android:pathData="M50.258,47.0 L57.522,47.0 L57.522,67.912 L59.943,67.912 L59.943,73.195 L48.057,73.195 L48.057,67.912 L50.258,67.912 Z"
+        android:strokeColor="#FF2B2F33"
+        android:strokeWidth="1"
+        android:strokeLineJoin="round">
         <aapt:attr name="android:fillColor">
-            <gradient android:type="linear" android:startX="49" android:startY="44.37" android:endX="59" android:endY="54.37">
+            <gradient android:type="linear" android:startX="48.057" android:startY="47.0" android:endX="59.943" android:endY="73.195">
+                <item android:offset="0" android:color="#FFF3D27A" />
+                <item android:offset="1" android:color="#FFC8952F" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Negro de la diana -->
+    <path
+        android:pathData="M43.8,35.6 a10.2,10.2 0 1,0 20.4,0 a10.2,10.2 0 1,0 -20.4,0 Z"
+        android:fillColor="#FF050607"
+        android:strokeWidth="1.6">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear" android:startX="0" android:startY="25.4" android:endX="0" android:endY="45.8">
+                <item android:offset="0" android:color="#FFF4F5F6" />
+                <item android:offset="1" android:color="#FF9DA1A6" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M48.084,35.6 a5.916,5.916 0 1,0 11.832,0 a5.916,5.916 0 1,0 -11.832,0 Z"
+        android:strokeColor="#FFCFD3D6"
+        android:strokeWidth="0.9" />
+    <!-- Impactos -->
+    <path
+        android:pathData="M50.474,35.272 a1.558,1.558 0 1,0 3.116,0 a1.558,1.558 0 1,0 -3.116,0 Z M54.82,32.812 a1.64,1.64 0 1,0 3.28,0 a1.64,1.64 0 1,0 -3.28,0 Z M49.941,38.224 a1.435,1.435 0 1,0 2.87,0 a1.435,1.435 0 1,0 -2.87,0 Z M53.344,37.978 a1.64,1.64 0 1,0 3.28,0 a1.64,1.64 0 1,0 -3.28,0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="49" android:startY="30.6" android:endX="59" android:endY="40.6">
                 <item android:offset="0" android:color="#FFF3D27A" />
                 <item android:offset="1" android:color="#FFC8952F" />
             </gradient>
