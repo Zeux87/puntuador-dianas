@@ -6,10 +6,17 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
+import android.content.res.Configuration;
+import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.provider.Settings;
+import android.util.JsonReader;
+import android.util.JsonToken;
+import android.util.JsonWriter;
+import android.view.View;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -29,10 +36,18 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 
 public class MainActivity extends Activity {
 
@@ -41,6 +56,8 @@ public class MainActivity extends Activity {
 
     private static final int REQ_CAMARA = 10;
     private static final int REQ_GALERIA = 11;
+    private static final int REQ_EXPORTAR = 12;
+    private static final int REQ_IMPORTAR = 13;
 
     private WebView web;
     private ValueCallback<Uri[]> callback;
@@ -87,7 +104,26 @@ public class MainActivity extends Activity {
             }
         });
 
+        aplicarTema("sistema");
         web.loadUrl("file:///android_asset/index.html");
+    }
+
+    /* ---------------- Tema: colores de las barras del sistema ---------------- */
+
+    private void aplicarTema(String modo) {
+        boolean noche = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                == Configuration.UI_MODE_NIGHT_YES;
+        boolean oscuro = "oscuro".equals(modo) || (!"claro".equals(modo) && noche);
+        int fondo = Color.parseColor(oscuro ? "#0E1213" : "#E8EBE6");
+        int superficie = Color.parseColor(oscuro ? "#162022" : "#F7F8F5");
+        getWindow().setStatusBarColor(fondo);
+        getWindow().setNavigationBarColor(superficie);
+        if (web != null) web.setBackgroundColor(fondo);
+        View decor = getWindow().getDecorView();
+        int f = decor.getSystemUiVisibility();
+        int claros = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        if (Build.VERSION.SDK_INT >= 26) claros |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        decor.setSystemUiVisibility(oscuro ? (f & ~claros) : (f | claros));
     }
 
     /* ---------------- Cámara y galería ---------------- */
@@ -125,6 +161,16 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == REQ_EXPORTAR || req == REQ_IMPORTAR) {
+            if (res != RESULT_OK || data == null || data.getData() == null) {
+                avisarCopia(false, "Cancelado.", false);
+            } else if (req == REQ_EXPORTAR) {
+                escribirCopia(data.getData());
+            } else {
+                leerCopia(data.getData());
+            }
+            return;
+        }
         if (callback == null) return;
         Uri[] resultado = null;
         if (res == RESULT_OK) {
@@ -195,6 +241,152 @@ public class MainActivity extends Activity {
     private synchronized void borrarDato(String clave) {
         if (!claveValida(clave)) return;
         new File(dirDatos(), clave).delete();
+    }
+
+    /* ---------------- Copia de seguridad ---------------- */
+
+    private void avisarCopia(boolean ok, String msg, boolean importada) {
+        try {
+            JSONObject r = new JSONObject();
+            r.put("ok", ok);
+            r.put("msg", msg);
+            r.put("importada", importada);
+            llamarJs("onBackupDone", r.toString());
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void exportarCopia() {
+        String fecha = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+        Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("application/json");
+        i.putExtra(Intent.EXTRA_TITLE, "puntuador-copia-" + fecha + ".json");
+        runOnUiThread(() -> {
+            try {
+                startActivityForResult(i, REQ_EXPORTAR);
+            } catch (Exception e) {
+                avisarCopia(false, "No se ha podido abrir el selector de archivos.", false);
+            }
+        });
+    }
+
+    private void importarCopia() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("*/*");
+        i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/json", "text/plain", "application/octet-stream"});
+        runOnUiThread(() -> {
+            try {
+                startActivityForResult(i, REQ_IMPORTAR);
+            } catch (Exception e) {
+                avisarCopia(false, "No se ha podido abrir el selector de archivos.", false);
+            }
+        });
+    }
+
+    // Escribe todas las sesiones y fotos en un archivo JSON, sin cargarlo entero en memoria
+    private void escribirCopia(Uri uri) {
+        new Thread(() -> {
+            int sesiones = 0;
+            try (OutputStream os = getContentResolver().openOutputStream(uri, "w");
+                 JsonWriter w = new JsonWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8))) {
+                w.beginObject();
+                w.name("app").value("puntuador-dianas");
+                w.name("formato").value(1);
+                w.name("fecha").value(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).format(new Date()));
+                w.name("version").value(nombreVersion());
+                w.name("datos").beginObject();
+                File[] archivos = dirDatos().listFiles();
+                if (archivos != null) {
+                    for (File f : archivos) {
+                        String k = f.getName();
+                        if (!claveValida(k) || "activa".equals(k)) continue;
+                        String v = leerDato(k);
+                        if (v == null) continue;
+                        if (k.startsWith("ses_")) sesiones++;
+                        w.name(k).value(v);
+                    }
+                }
+                w.endObject();
+                w.endObject();
+            } catch (Exception e) {
+                avisarCopia(false, "No se ha podido guardar la copia. Prueba en otra carpeta.", false);
+                return;
+            }
+            avisarCopia(true, "Copia guardada con " + sesiones + (sesiones == 1 ? " sesión." : " sesiones."), false);
+        }).start();
+    }
+
+    private void leerCopia(Uri uri) {
+        new Thread(() -> {
+            int sesiones = 0;
+            try (InputStream is = getContentResolver().openInputStream(uri);
+                 JsonReader r = new JsonReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                boolean esNuestra = false;
+                String indice = null;
+                r.beginObject();
+                while (r.hasNext()) {
+                    String n = r.nextName();
+                    if ("app".equals(n) && r.peek() == JsonToken.STRING) {
+                        esNuestra = "puntuador-dianas".equals(r.nextString());
+                    } else if ("datos".equals(n)) {
+                        if (!esNuestra) throw new IllegalArgumentException();
+                        r.beginObject();
+                        while (r.hasNext()) {
+                            String k = r.nextName();
+                            if (r.peek() != JsonToken.STRING) {
+                                r.skipValue();
+                                continue;
+                            }
+                            String v = r.nextString();
+                            if (!claveValida(k) || "activa".equals(k)) continue;
+                            if ("sesiones".equals(k)) {
+                                indice = v;
+                                continue;
+                            }
+                            if (escribirDato(k, v) && k.startsWith("ses_")) sesiones++;
+                        }
+                        r.endObject();
+                    } else {
+                        r.skipValue();
+                    }
+                }
+                r.endObject();
+                if (!esNuestra) throw new IllegalArgumentException();
+                if (indice != null) fusionarIndice(indice);
+            } catch (IllegalArgumentException e) {
+                avisarCopia(false, "Ese archivo no es una copia del Puntuador de dianas.", false);
+                return;
+            } catch (Exception e) {
+                avisarCopia(false, "No se ha podido leer la copia. Comprueba que el archivo está completo.", false);
+                return;
+            }
+            avisarCopia(true, "Copia restaurada: " + sesiones + (sesiones == 1 ? " sesión." : " sesiones."), true);
+        }).start();
+    }
+
+    // Une el listado de sesiones de la copia con el actual; si una sesión está en los dos, gana la de la copia
+    private synchronized void fusionarIndice(String nuevo) throws Exception {
+        LinkedHashMap<String, JSONObject> m = new LinkedHashMap<>();
+        String actual = leerDato("sesiones");
+        if (actual != null) {
+            JSONArray a = new JSONArray(actual);
+            for (int i = 0; i < a.length(); i++) {
+                JSONObject o = a.getJSONObject(i);
+                m.put(o.optString("id"), o);
+            }
+        }
+        JSONArray b = new JSONArray(nuevo);
+        for (int i = 0; i < b.length(); i++) {
+            JSONObject o = b.getJSONObject(i);
+            m.put(o.optString("id"), o);
+        }
+        List<JSONObject> lista = new ArrayList<>(m.values());
+        lista.sort((x, y) -> y.optString("creada").compareTo(x.optString("creada")));
+        JSONArray out = new JSONArray();
+        for (JSONObject o : lista) out.put(o);
+        escribirDato("sesiones", out.toString());
     }
 
     /* ---------------- Versión instalada ---------------- */
@@ -385,6 +577,21 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void storeDelete(String clave) {
             borrarDato(clave);
+        }
+
+        @JavascriptInterface
+        public void exportBackup() {
+            exportarCopia();
+        }
+
+        @JavascriptInterface
+        public void importBackup() {
+            importarCopia();
+        }
+
+        @JavascriptInterface
+        public void setTheme(final String modo) {
+            runOnUiThread(() -> aplicarTema(modo));
         }
 
         @JavascriptInterface

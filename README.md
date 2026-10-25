@@ -14,6 +14,7 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 - Deja mover, añadir y eliminar impactos a mano, y calibrar la diana tocando el centro y el borde del negro.
 - Guarda sesiones de entrenamiento y competición: nº de dianas, impactos por diana, foto de cada diana, totales, gráficas e histórico con la evolución.
 - Estadísticas del histórico: media, diámetro medio de agrupación, radio medio, deriva (nivel, dirección y constancia), dispersión horizontal y vertical, reparto por anillos, rendimiento a lo largo de la sesión y mejores marcas.
+- Navegación con barra inferior (columna lateral en pantallas anchas) y pantalla de Ajustes: disciplina y sensibilidad por defecto, tema claro u oscuro, copia de seguridad (exportar y restaurar) y actualizaciones.
 - Funciona sin conexión.
 
 ## Estructura
@@ -24,6 +25,6 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 
 ## Actualizaciones
 
-La app comprueba al abrirse si hay una versión nueva en Releases y muestra un aviso. También hay un botón «Buscar actualizaciones» al final de la pantalla. Para que funcione, el repositorio tiene que ser público.
+La app comprueba al abrirse si hay una versión nueva en Releases y muestra un aviso. También hay un botón «Buscar actualizaciones» en Ajustes. Para que funcione, el repositorio tiene que ser público.
 
 La clave de firma (`app/puntuador.jks`) está en el repositorio para que cada versión se pueda instalar encima de la anterior. La app solo se actualiza desde las versiones publicadas aquí.

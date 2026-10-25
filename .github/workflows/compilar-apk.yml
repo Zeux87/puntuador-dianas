@@ -30,7 +30,16 @@ jobs:
       - name: Compilar el APK
         env:
           BUILD_NUMBER: ${{ github.run_number }}
-        run: gradle assembleRelease --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          gradle assembleRelease --no-daemon --stacktrace 2>&1 | tee compilacion.log
+
+      - name: Mostrar errores de compilación
+        if: failure()
+        run: |
+          grep -E "error:|e: |FAILURE|What went wrong" -A 3 compilacion.log | head -n 60 | while IFS= read -r l; do
+            echo "::error::${l//%/%25}"
+          done
 
       - name: Renombrar el APK
         run: cp app/build/outputs/apk/release/app-release.apk "PuntuadorDianas-1.0.${{ github.run_number }}.apk"
