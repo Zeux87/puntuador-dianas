@@ -80,6 +80,22 @@ select{background:var(--surface);border:1px solid var(--line);border-radius:8px;
   padding:10px 12px;font-weight:600;font-size:.92rem;display:flex;justify-content:space-between;gap:10px;align-items:center;
 }
 .banner button{font:600 .85rem var(--f-body);background:none;border:0;color:var(--accent);cursor:pointer;padding:4px}
+.zoombar{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:6px;line-height:1}
+.zoombar button{width:44px;height:44px;border-radius:10px;border:1px solid rgba(255,255,255,.28);background:rgba(16,20,21,.8);color:#fff;
+  font:700 1.5rem var(--f-display);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;-webkit-tap-highlight-color:transparent}
+.zoombar button.zl{font-size:.95rem;font-variant-numeric:tabular-nums}
+.zoombar button:disabled{opacity:.4;cursor:default}
+.zoombar button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.nudge{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;padding:8px 10px}
+.nudge .nl{display:flex;flex-direction:column;line-height:1.25;min-width:0}
+.nudge .nl small{color:var(--muted);font-size:.78rem}
+.nudge .nl b{font-weight:600}
+.nudge .nv{font-family:var(--f-display);font-weight:700;font-size:1.15rem;font-variant-numeric:tabular-nums;color:var(--accent)}
+.nudge .pad{display:flex;gap:6px}
+.nudge .pad button{width:46px;height:46px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:700 1.25rem var(--f-body);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;user-select:none;-webkit-user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent}
+.nudge .pad button:active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.nudge .pad button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .status{margin:0;color:var(--muted);font-size:.9rem;min-height:1.5em}
 .status b{color:var(--ink);font-weight:600}
 .sens{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
@@ -301,6 +317,23 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
         <canvas id="view" aria-label="Foto de la diana con los impactos marcados"></canvas>
         <div id="emptyStage" class="empty-stage" hidden><div id="emptyText"></div></div>
         <div id="banner" class="banner" hidden><span id="bannerText"></span><button id="bannerCancel" type="button">Cancelar</button></div>
+        <div id="zoomBar" class="zoombar" hidden>
+          <button id="zIn" type="button" aria-label="Ampliar">+</button>
+          <button id="zFit" class="zl" type="button" aria-label="Quitar el zoom">×1</button>
+          <button id="zOut" type="button" aria-label="Reducir">−</button>
+        </div>
+      </div>
+      <div id="nudge" class="nudge" hidden>
+        <div class="nl">
+          <small>Ajuste fino · 0,1 mm por toque</small>
+          <span><b id="nudgeSel">Impacto 1</b> · <span id="nudgeVal" class="nv">–</span></span>
+        </div>
+        <div class="pad" id="nudgePad">
+          <button type="button" data-dx="-1" data-dy="0" aria-label="Mover a la izquierda">←</button>
+          <button type="button" data-dx="0" data-dy="-1" aria-label="Mover arriba">↑</button>
+          <button type="button" data-dx="0" data-dy="1" aria-label="Mover abajo">↓</button>
+          <button type="button" data-dx="1" data-dy="0" aria-label="Mover a la derecha">→</button>
+        </div>
       </div>
       <p id="status" class="status" role="status"></p>
 
@@ -325,6 +358,8 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
           <li>Foto de frente, con la diana plana, entera y sin flash. Que el negro ocupe buena parte de la imagen.</li>
           <li>Sin contraluz, los impactos en la zona blanca casi no se ven: añádelos tocando «+ Añadir impacto».</li>
           <li>Los dobles se marcan en naranja como dudosos. Revísalos y arrastra cada impacto a su sitio.</li>
+          <li>Para ver los impactos de cerca, pellizca la foto, toca dos veces o usa los botones + y −. Con la foto ampliada, arrastra en una zona vacía para moverte.</li>
+          <li>Si un impacto no queda justo en el agujero, tócalo y ajústalo con las flechas de «Ajuste fino» (mantén pulsado para ir más rápido).</li>
           <li>Si no localiza la diana, usa «Calibrar a mano»: toca el centro y después el borde del negro.</li>
           <li>La puntuación sigue la regla ISSF: cuenta el anillo más alto que toque el perdigón de 4,5 mm.</li>
         </ul>
@@ -1103,7 +1138,9 @@ const fmt1 = v => v.toFixed(1).replace('.', ',');
 
 /* ===================== Interfaz ===================== */
 const St = { disc:'pistola', P:null, cal:null, calManual:false, shots:[], sel:-1, mode:'edit', calTmp:null,
-             view:'target', sens:60, sample:true, drag:null, nextId:1, k:1, r:{x:0,y:0,w:1,h:1}, u:1, msg:'' };
+             view:'target', sens:60, sample:true, drag:null, nextId:1, k:1, r:{x:0,y:0,w:1,h:1}, u:1, msg:'',
+             z:1, zc:null };
+const ZMAX = 8;
 const D = () => DISC[St.disc];
 const $ = id => document.getElementById(id);
 
@@ -1145,7 +1182,7 @@ function redetect(prefix){
   m += nl ? `Anillos ajustados con ${nl} de ${tot} líneas impresas. ` : 'No veo bien las líneas de los anillos: escala calculada solo con el negro. ';
   m += `<b>${St.shots.length} ${St.shots.length === 1 ? 'impacto detectado' : 'impactos detectados'}.</b> `;
   if (dud) m += `${dud} en naranja: posible doble, revísalos. `;
-  m += 'Toca un impacto para moverlo o eliminarlo.';
+  m += 'Toca un impacto para moverlo o eliminarlo. Pellizca o toca dos veces la foto para ampliarla.';
   St.msg = m;
   update();
 }
@@ -1162,11 +1199,46 @@ function viewRect(){
   return { x:0, y:0, w:P.w, h:P.h };
 }
 
+/* Zoom: St.z es el aumento sobre la vista base y St.zc el centro (en píxeles de imagen) de lo que se ve */
+function zoomRect(){
+  const r0 = viewRect();
+  if (St.z <= 1.001 || !St.zc) return r0;
+  const w = r0.w / St.z, h = r0.h / St.z;
+  const x = Math.max(r0.x, Math.min(r0.x + r0.w - w, St.zc.x - w / 2));
+  const y = Math.max(r0.y, Math.min(r0.y + r0.h - h, St.zc.y - h / 2));
+  St.zc = { x: x + w / 2, y: y + h / 2 };
+  return { x, y, w, h };
+}
+function resetZoom(){ St.z = 1; St.zc = null; }
+// Aplica el aumento z dejando el punto de imagen p bajo la fracción (fx, fy) del lienzo
+function zoomAt(z, p, fx, fy){
+  const r0 = viewRect();
+  St.z = Math.max(1, Math.min(ZMAX, z));
+  if (St.z <= 1.001){ resetZoom(); return; }
+  const w = r0.w / St.z, h = r0.h / St.z;
+  St.zc = { x: p.x - fx * w + w / 2, y: p.y - fy * h + h / 2 };
+}
+// Botones + y −: si hay un impacto seleccionado, amplía sobre él
+function zoomStep(f){
+  if (!St.P) return;
+  const r = St.r, sh = St.sel >= 0 ? St.shots[St.sel] : null;
+  const p = sh ? { x: sh.x, y: sh.y } : { x: r.x + r.w / 2, y: r.y + r.h / 2 };
+  zoomAt(St.z * f, p, 0.5, 0.5);
+  render(); syncZoom();
+}
+function syncZoom(){
+  $('zoomBar').hidden = !St.P;
+  $('zIn').disabled = St.z >= ZMAX - 0.001;
+  $('zOut').disabled = St.z <= 1.001;
+  $('zFit').disabled = St.z <= 1.001;
+  $('zFit').textContent = '×' + (St.z < 9.95 ? fmt1(St.z).replace(',0', '') : Math.round(St.z));
+}
+
 function render(){
   const cv = $('view'), P = St.P;
   $('emptyStage').hidden = !!P; cv.hidden = !P;
   if (!P) return;
-  const r = viewRect();
+  const r = zoomRect();
   const cssW = $('cwrap').clientWidth || 600;
   const u = Math.min(2, window.devicePixelRatio || 1);
   const k = cssW * u / r.w;
@@ -1180,7 +1252,7 @@ function render(){
   x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
   x.drawImage(P.canvas, 0, 0);
   drawOverlay(x, k, u);
-  if (St.drag && St.drag.p) drawLoupe(x, k, u, W, H);
+  if (St.drag && St.drag.p && St.z < 3) drawLoupe(x, k, u, W, H);
 }
 
 // Traza un anillo real (radio en mm) siguiendo la calibración de cada ángulo
@@ -1272,45 +1344,181 @@ function hitShot(p){
   return bi;
 }
 
+/* Gestos sobre la foto:
+   - un dedo sobre un impacto: moverlo (en modo añadir, tocar fuera crea uno nuevo)
+   - un dedo en zona vacía: con la foto ampliada, desplazarla; si apenas se mueve, es un toque
+   - dos dedos: pellizcar para ampliar o reducir y arrastrar
+   - doble toque en zona vacía: ampliar ×3 en ese punto, o volver a la vista entera */
+const Ptr = new Map();
+let G = null, lastTap = null;
+
+function cvFrac(cx, cy){
+  const b = $('view').getBoundingClientRect();
+  return { fx: (cx - b.left) / b.width, fy: (cy - b.top) / b.height, bw: b.width, bh: b.height };
+}
+function startPan(cx, cy){
+  if (St.z <= 1.001 || !St.zc) return { type: 'idle' };
+  return { type: 'pan', sx: cx, sy: cy, c0: { x: St.zc.x, y: St.zc.y } };
+}
+function startPinch(){
+  // Un segundo dedo anula lo que estuviera haciendo el primero
+  if (St.drag){
+    const dr = St.drag, sh = St.shots[dr.i];
+    if (dr.added){ St.shots.splice(dr.i, 1); St.sel = -1; }
+    else if (sh){ sh.x = dr.x0; sh.y = dr.y0; sh.dudoso = dr.dud0; }
+    St.drag = null;
+  }
+  const [a, b] = [...Ptr.values()];
+  const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, f = cvFrac(mx, my), r = St.r;
+  G = { type: 'pinch', d0: Math.max(10, Math.hypot(a.x - b.x, a.y - b.y)), z0: St.z,
+        m0: { x: r.x + f.fx * r.w, y: r.y + f.fy * r.h } };
+  lastTap = null;
+  update();
+}
+
 function onDown(e){
   e.preventDefault();
-  const p = evtProc(e), cv = $('view');
+  if (!St.P) return;
+  const cv = $('view');
+  Ptr.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+  if (Ptr.size === 2){ startPinch(); return; }
+  if (Ptr.size > 2) return;
+  const p = evtProc(e);
+  G = { type: 'tap', sx: e.clientX, sy: e.clientY, p };
+  if (St.mode === 'cal1' || St.mode === 'cal2' || !St.cal) return;   // se resuelve al levantar el dedo
+  const hit = hitShot(p);
+  if (hit >= 0){
+    const sh = St.shots[hit];
+    St.sel = hit;
+    St.drag = { i: hit, ox: sh.x - p.x, oy: sh.y - p.y, start: p, moved: false, p: null, x0: sh.x, y0: sh.y, dud0: sh.dudoso };
+    G.type = 'shot';
+    update();
+  } else if (St.mode === 'add'){
+    St.shots.push({ id: St.nextId++, x: p.x, y: p.y, dudoso: false });
+    St.sel = St.shots.length - 1;
+    St.drag = { i: St.sel, ox: 0, oy: 0, start: p, moved: true, p: { x: p.x, y: p.y }, added: true };
+    G.type = 'shot';
+    update();
+  }
+}
+
+function onMove(e){
+  if (!Ptr.has(e.pointerId)) return;
+  Ptr.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (!G) return;
+  if (G.type === 'pinch'){
+    if (Ptr.size < 2) return;
+    const [a, b] = [...Ptr.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y), f = cvFrac((a.x + b.x) / 2, (a.y + b.y) / 2);
+    zoomAt(G.z0 * d / G.d0, G.m0, f.fx, f.fy);
+    render(); syncZoom();
+    return;
+  }
+  if (G.type === 'shot'){
+    const dr = St.drag; if (!dr) return;
+    const p = evtProc(e);
+    if (!dr.moved && Math.hypot(p.x - dr.start.x, p.y - dr.start.y) * St.k / St.u < 4) return;
+    dr.moved = true;
+    const sh = St.shots[dr.i];
+    sh.x = p.x + dr.ox; sh.y = p.y + dr.oy; sh.dudoso = false;
+    dr.p = { x: sh.x, y: sh.y };
+    render(); renderResults();
+    return;
+  }
+  if (G.type === 'tap'){
+    // Sin zoom no hay nada que desplazar: sigue contando como toque
+    if (St.z <= 1.001 || Math.hypot(e.clientX - G.sx, e.clientY - G.sy) < 8) return;
+    G = startPan(G.sx, G.sy);
+  }
+  if (G.type === 'pan'){
+    const f = cvFrac(0, 0), r = St.r;
+    St.zc = { x: G.c0.x - (e.clientX - G.sx) * r.w / f.bw, y: G.c0.y - (e.clientY - G.sy) * r.h / f.bh };
+    render();
+  }
+}
+
+function onUp(e){
+  if (!Ptr.has(e.pointerId)) return;
+  Ptr.delete(e.pointerId);
+  if (!G) return;
+  if (G.type === 'pinch'){
+    if (Ptr.size === 1){ const q = [...Ptr.values()][0]; G = startPan(q.x, q.y); }
+    else if (!Ptr.size) G = null;
+    syncZoom();
+    return;
+  }
+  if (Ptr.size) return;
+  const g = G; G = null;
+  if (g.type === 'shot'){ St.drag = null; update(); return; }
+  if (g.type === 'tap' && e.type !== 'pointercancel') onTap(g.p, e.clientX, e.clientY);
+}
+
+function onTap(p, cx, cy){
   if (St.mode === 'cal1'){ St.calTmp = p; St.mode = 'cal2'; banner('Ahora toca el borde exterior del negro.'); render(); return; }
   if (St.mode === 'cal2'){
     const r = Math.hypot(p.x - St.calTmp.x, p.y - St.calTmp.y);
     if (r * St.k / St.u < 8) return;
     St.cal = { cx: St.calTmp.x, cy: St.calTmp.y, a: r, b: r, theta: 0 };
     St.calManual = true; St.calTmp = null; St.mode = 'edit'; banner(null);
+    resetZoom();
     if (St.P.t0 == null) St.P.t0 = otsu(St.P.g);
     redetect(); return;
   }
   if (!St.cal) return;
-  const hit = hitShot(p);
-  if (hit >= 0){
-    St.sel = hit;
-    St.drag = { i: hit, ox: St.shots[hit].x - p.x, oy: St.shots[hit].y - p.y, start: p, moved: false, p: null };
-    try { cv.setPointerCapture(e.pointerId); } catch (_) {}
-  } else if (St.mode === 'add'){
-    St.shots.push({ id: St.nextId++, x: p.x, y: p.y, dudoso: false });
-    St.sel = St.shots.length - 1;
-    St.drag = { i: St.sel, ox: 0, oy: 0, start: p, moved: true, p: { x: p.x, y: p.y } };
-    try { cv.setPointerCapture(e.pointerId); } catch (_) {}
-  } else {
-    St.sel = -1;
+  const now = Date.now();
+  if (lastTap && now - lastTap.t < 350 && Math.hypot(cx - lastTap.x, cy - lastTap.y) < 30){
+    lastTap = null;
+    if (St.z < 2){ const f = cvFrac(cx, cy); zoomAt(3, p, f.fx, f.fy); } else resetZoom();
+    render(); syncZoom();
+    return;
+  }
+  lastTap = { t: now, x: cx, y: cy };
+  if (St.sel >= 0){ St.sel = -1; update(); }
+}
+
+function onWheel(e){
+  if (!St.P) return;
+  e.preventDefault();
+  const f = cvFrac(e.clientX, e.clientY), p = evtProc(e);
+  zoomAt(St.z * Math.exp(-e.deltaY * 0.0015), p, f.fx, f.fy);
+  render(); syncZoom();
+}
+
+/* Ajuste fino del impacto seleccionado: 0,1 mm por pulsación; mantener pulsado repite */
+function nudge(dx, dy){
+  if (St.sel < 0 || !St.cal) return;
+  const sh = St.shots[St.sel]; if (!sh) return;
+  const step = 0.1 * holePx() / PELLET;
+  sh.x += dx * step; sh.y += dy * step; sh.dudoso = false;
+  // Si el impacto se sale de lo que se ve, la vista ampliada lo sigue
+  if (St.z > 1.001){
+    const r = St.r, m = Math.min(r.w, r.h) * 0.08;
+    if (sh.x < r.x + m || sh.x > r.x + r.w - m || sh.y < r.y + m || sh.y > r.y + r.h - m) St.zc = { x: sh.x, y: sh.y };
   }
   update();
 }
-function onMove(e){
-  if (!St.drag) return;
-  const p = evtProc(e), dr = St.drag;
-  if (!dr.moved && Math.hypot(p.x - dr.start.x, p.y - dr.start.y) * St.k / St.u < 4) return;
-  dr.moved = true;
-  const sh = St.shots[dr.i];
-  sh.x = p.x + dr.ox; sh.y = p.y + dr.oy; sh.dudoso = false;
-  dr.p = { x: sh.x, y: sh.y };
-  render(); renderResults();
+function syncNudge(info){
+  const on = St.sel >= 0 && !!St.cal && !!info[St.sel];
+  $('nudge').hidden = !on;
+  if (!on) return;
+  $('nudgeSel').textContent = 'Impacto ' + (St.sel + 1);
+  $('nudgeVal').textContent = fmt1(info[St.sel].dec);
 }
-function onUp(){ if (!St.drag) return; St.drag = null; update(); }
+function initNudge(){
+  let tA = null, tB = null;
+  const stop = () => { clearTimeout(tA); clearInterval(tB); tA = tB = null; };
+  $('nudgePad').querySelectorAll('button').forEach(b => {
+    const dx = +b.dataset.dx, dy = +b.dataset.dy;
+    b.addEventListener('pointerdown', e => {
+      e.preventDefault(); stop(); nudge(dx, dy);
+      tA = setTimeout(() => { tB = setInterval(() => nudge(dx, dy), 60); }, 380);
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => b.addEventListener(t, stop));
+    b.addEventListener('click', e => { if (e.detail === 0) nudge(dx, dy); });   // teclado
+    b.addEventListener('contextmenu', e => e.preventDefault());
+  });
+}
 
 function banner(text){
   const b = $('banner');
@@ -1330,6 +1538,7 @@ function syncControls(){
   $('viewToggle').disabled = !St.cal;
   $('viewToggle').textContent = St.view === 'target' ? 'Ver foto entera' : 'Ver solo la diana';
   $('auto').textContent = St.calManual ? 'Detección automática' : 'Volver a detectar';
+  syncZoom();
 }
 
 function renderResults(){
@@ -1366,10 +1575,15 @@ function renderResults(){
     const note = St.shots[i].dudoso ? '<span class="m flag">¿doble?</span>' : `<span class="m">${s.x ? 'X · ' : ''}a las ${clockOf(s.mx, s.my)}</span>`;
     b.innerHTML = `<span class="n">${i + 1}</span><span class="v${s.int === 10 ? ' top' : ''}">${fmt1(s.dec)}</span>${note}`;
     b.setAttribute('aria-label', `Impacto ${i + 1}: ${fmt1(s.dec)} puntos`);
-    b.addEventListener('click', () => { St.sel = i === St.sel ? -1 : i; update(); });
+    b.addEventListener('click', () => {
+      St.sel = i === St.sel ? -1 : i;
+      if (St.sel >= 0 && St.z > 1.001) St.zc = { x: St.shots[i].x, y: St.shots[i].y };   // con zoom, lleva la vista al impacto
+      update();
+    });
     li.appendChild(b); ol.appendChild(li);
   });
   $('emptyList').hidden = n > 0;
+  syncNudge(info);
   drawPlot(info, mpi);
 }
 
@@ -1440,7 +1654,7 @@ function loadSource(src, isSample){
   St.sens = Cfg.sensDef;
   if ($('sens')){ $('sens').value = St.sens; $('sensOut').textContent = St.sens; }
   St.P = prepare(src); St.cal = null; St.calManual = false; St.sample = isSample;
-  St.mode = 'edit'; St.calTmp = null; banner(null); St.view = 'target';
+  St.mode = 'edit'; St.calTmp = null; banner(null); St.view = 'target'; resetZoom();
   analyze(isSample ? 'Foto de ejemplo.' : '');
 }
 function loadFile(file){
@@ -1568,7 +1782,7 @@ function syncSessionBar(){
 
 function clearStage(msg){
   St.P = null; St.cal = null; St.shots = []; St.sel = -1; St.sample = false; St.mode = 'edit'; St.calTmp = null;
-  banner(null);
+  resetZoom(); banner(null);
   St.msg = msg || '';
   update();
 }
@@ -2457,6 +2671,12 @@ function init(){
   cv.addEventListener('pointermove', onMove);
   cv.addEventListener('pointerup', onUp);
   cv.addEventListener('pointercancel', onUp);
+  cv.addEventListener('wheel', onWheel, { passive: false });
+  cv.addEventListener('contextmenu', e => e.preventDefault());
+  $('zIn').addEventListener('click', () => zoomStep(1.6));
+  $('zOut').addEventListener('click', () => zoomStep(1 / 1.6));
+  $('zFit').addEventListener('click', () => { resetZoom(); render(); syncZoom(); });
+  initNudge();
   $('cam').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
   $('gal').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
   $('sample').addEventListener('click', () => loadSource(makeSample(), true));
@@ -2468,15 +2688,19 @@ function init(){
   });
   $('addMode').addEventListener('click', () => { St.mode = St.mode === 'add' ? 'edit' : 'add'; if (St.mode === 'add') St.msg = 'Toca la foto donde esté cada impacto que falte. Pulsa otra vez el botón para terminar.'; syncControls(); });
   $('del').addEventListener('click', () => { if (St.sel < 0) return; St.shots.splice(St.sel, 1); St.sel = -1; update(); });
-  $('calib').addEventListener('click', () => { St.mode = 'cal1'; St.calTmp = null; St.view = 'full'; banner('Toca el centro de la diana.'); update(); });
-  $('bannerCancel').addEventListener('click', () => { St.mode = 'edit'; St.calTmp = null; banner(null); if (St.cal) St.view = 'target'; update(); });
+  $('calib').addEventListener('click', () => { St.mode = 'cal1'; St.calTmp = null; St.view = 'full'; resetZoom(); banner('Toca el centro de la diana.'); update(); });
+  $('bannerCancel').addEventListener('click', () => { St.mode = 'edit'; St.calTmp = null; banner(null); if (St.cal) St.view = 'target'; resetZoom(); update(); });
   $('auto').addEventListener('click', () => { St.calManual = false; analyze(St.sample ? 'Foto de ejemplo.' : ''); });
-  $('viewToggle').addEventListener('click', () => { St.view = St.view === 'target' ? 'full' : 'target'; render(); syncControls(); });
+  $('viewToggle').addEventListener('click', () => { St.view = St.view === 'target' ? 'full' : 'target'; resetZoom(); render(); syncControls(); });
   $('copy').addEventListener('click', () => copyText(summaryText(), $('copyMsg'), $('fallback')));
   document.addEventListener('keydown', e => {
     const tag = document.activeElement ? document.activeElement.tagName : '';
     if ((e.key === 'Delete' || e.key === 'Backspace') && St.sel >= 0 && SV.tab === 'puntuar' && tag !== 'INPUT' && tag !== 'TEXTAREA'){
       St.shots.splice(St.sel, 1); St.sel = -1; update();
+    }
+    const AR = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (AR && St.sel >= 0 && SV.tab === 'puntuar' && tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT'){
+      e.preventDefault(); nudge(AR[0], AR[1]);
     }
   });
   let rsT = null;
