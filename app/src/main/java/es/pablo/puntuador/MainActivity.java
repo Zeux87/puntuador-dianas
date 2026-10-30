@@ -1,11 +1,13 @@
 package es.pablo.puntuador;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.net.Uri;
@@ -18,6 +20,7 @@ import android.util.JsonToken;
 import android.util.JsonWriter;
 import android.view.View;
 import android.webkit.JavascriptInterface;
+import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -58,10 +61,14 @@ public class MainActivity extends Activity {
     private static final int REQ_GALERIA = 11;
     private static final int REQ_EXPORTAR = 12;
     private static final int REQ_IMPORTAR = 13;
+    private static final int REQ_PERMISO_WEB = 20;
+    private static final int REQ_PERMISO_CAMARA = 21;
 
     private WebView web;
     private ValueCallback<Uri[]> callback;
     private Uri fotoUri;
+    // Petición de cámara de la página que espera a que Android conceda el permiso
+    private PermissionRequest permisoWeb;
 
     // Datos de la última versión encontrada en GitHub
     private volatile String urlApk = null;
@@ -77,6 +84,7 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setAllowFileAccess(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
 
         web.addJavascriptInterface(new Puente(), "AndroidApp");
 
@@ -101,6 +109,35 @@ public class MainActivity extends Activity {
                 if (p.isCaptureEnabled()) abrirCamara();
                 else abrirGaleria();
                 return true;
+            }
+
+            // Cámara integrada de la página: solo para la propia app (file://)
+            @Override
+            public void onPermissionRequest(final PermissionRequest r) {
+                runOnUiThread(() -> {
+                    boolean pideCamara = false;
+                    for (String res : r.getResources()) {
+                        if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(res)) pideCamara = true;
+                    }
+                    Uri origen = r.getOrigin();
+                    boolean propia = origen != null && "file".equals(origen.getScheme());
+                    if (!pideCamara || !propia) {
+                        r.deny();
+                        return;
+                    }
+                    if (tienePermisoCamara()) {
+                        r.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                        return;
+                    }
+                    if (permisoWeb != null) permisoWeb.deny();
+                    permisoWeb = r;
+                    requestPermissions(new String[]{Manifest.permission.CAMERA}, REQ_PERMISO_WEB);
+                });
+            }
+
+            @Override
+            public void onPermissionRequestCanceled(PermissionRequest r) {
+                if (permisoWeb == r) permisoWeb = null;
             }
         });
 
@@ -128,7 +165,44 @@ public class MainActivity extends Activity {
 
     /* ---------------- Cámara y galería ---------------- */
 
+    private boolean tienePermisoCamara() {
+        return checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int req, String[] permisos, int[] resultados) {
+        super.onRequestPermissionsResult(req, permisos, resultados);
+        boolean ok = resultados != null && resultados.length > 0
+                && resultados[0] == PackageManager.PERMISSION_GRANTED;
+        if (req == REQ_PERMISO_WEB) {
+            PermissionRequest r = permisoWeb;
+            permisoWeb = null;
+            if (r == null) return;
+            if (ok) r.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+            else r.deny();
+        } else if (req == REQ_PERMISO_CAMARA) {
+            if (ok) {
+                lanzarCamara();
+            } else {
+                Toast.makeText(this, "Sin permiso de cámara", Toast.LENGTH_SHORT).show();
+                if (callback != null) {
+                    callback.onReceiveValue(null);
+                    callback = null;
+                }
+            }
+        }
+    }
+
+    // Cámara del sistema (respaldo): al declarar el permiso CAMERA, Android exige tenerlo concedido
     private void abrirCamara() {
+        if (!tienePermisoCamara()) {
+            requestPermissions(new String[]{Manifest.permission.CAMERA}, REQ_PERMISO_CAMARA);
+            return;
+        }
+        lanzarCamara();
+    }
+
+    private void lanzarCamara() {
         try {
             File dir = new File(getCacheDir(), "fotos");
             if (!dir.exists()) dir.mkdirs();

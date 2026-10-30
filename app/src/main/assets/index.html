@@ -249,6 +249,33 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
 .rbar i{display:block;height:100%;background:var(--accent);border-radius:4px}
 .rv{text-align:right;color:var(--muted);font-size:.85rem}
 .demonote{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+/* Cámara integrada: pantalla completa, se dispara y la foto pasa directa a puntuar */
+html.camopen,html.camopen body{overflow:hidden}
+.camview{position:fixed;inset:0;z-index:60;background:#000;color:#fff;display:flex;flex-direction:column;touch-action:none}
+.camview video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+.camguide{position:absolute;left:50%;top:50%;width:min(72vw,52vh);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+  border:3px solid #45c4d0;box-shadow:0 0 0 1.5px rgba(0,0,0,.55),inset 0 0 0 1.5px rgba(0,0,0,.55);pointer-events:none}
+.camguide::before,.camguide::after{content:"";position:absolute;left:50%;top:50%;background:#45c4d0;box-shadow:0 0 0 1px rgba(0,0,0,.55);transform:translate(-50%,-50%)}
+.camguide::before{width:22px;height:2px}
+.camguide::after{width:2px;height:22px}
+.camtop{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:calc(10px + env(safe-area-inset-top,0px)) max(12px, env(safe-area-inset-right,0px)) 10px max(16px, env(safe-area-inset-left,0px));
+  background:linear-gradient(rgba(0,0,0,.6),rgba(0,0,0,0))}
+.camtop span{font-family:var(--f-display);font-weight:700;font-size:1.35rem;letter-spacing:.01em}
+.camclose{width:48px;height:48px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(16,20,21,.7);color:#fff;
+  font:400 1.9rem/1 var(--f-body);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.cammsg{position:relative;margin:auto 16px;background:var(--surface);color:var(--ink);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px;
+  max-width:420px;align-self:center;line-height:1.4}
+.cammsg b{font-weight:600}
+.cambot{position:relative;margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:12px;
+  padding:16px 16px calc(22px + env(safe-area-inset-bottom,0px));background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.65))}
+.camhint{font-size:.88rem;color:#e3e8e5;text-align:center;max-width:36ch}
+.shutter{width:76px;height:76px;border-radius:50%;border:4px solid #fff;background:rgba(255,255,255,.18);cursor:pointer;padding:0;
+  display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+.shutter::after{content:"";width:58px;height:58px;border-radius:50%;background:#fff;transition:transform .08s}
+.shutter:active::after{transform:scale(.88)}
+.shutter:disabled{opacity:.4;cursor:default}
+.shutter:focus-visible,.camclose:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -305,12 +332,13 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
         </div>
       </div>
 
-      <div class="row">
-        <label class="btn primary" for="cam">Hacer foto</label>
-        <input id="cam" type="file" accept="image/*" capture="environment" hidden>
-        <label class="btn" for="gal">Elegir de la galería</label>
-        <input id="gal" type="file" accept="image/*" hidden>
+      <div class="row" id="photoRow">
+        <button id="shootBtn" class="btn primary" type="button">Hacer foto</button>
+        <button id="galBtn" class="btn" type="button">Elegir de la galería</button>
         <button id="sample" class="btn" type="button">Ver ejemplo</button>
+        <button id="switchSrc" class="btn" type="button" hidden>Usar la galería</button>
+        <input id="cam" type="file" accept="image/*" capture="environment" hidden>
+        <input id="gal" type="file" accept="image/*" hidden>
       </div>
 
       <div class="canvas-wrap" id="cwrap">
@@ -430,6 +458,14 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
             <option value="pistola">Pistola aire 10 m</option>
             <option value="carabina">Carabina aire 10 m</option>
           </select>
+        </div>
+        <div class="field">
+          <span class="lbl">Fotos de las dianas</span>
+          <div class="row">
+            <button id="fFuenteCam" class="btn" type="button" aria-pressed="true">Con la cámara</button>
+            <button id="fFuenteGal" class="btn" type="button" aria-pressed="false">De la galería</button>
+          </div>
+          <small>Se usa para todas las dianas de la sesión. Al guardar una diana se abre sola para la siguiente.</small>
         </div>
         <div class="chips" id="presets" aria-label="Formatos habituales">
           <button class="chip" type="button" data-d="12" data-p="5">60 disparos · 12 × 5</button>
@@ -564,6 +600,23 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
       </div>
     </div>
   </section>
+
+  <div id="camView" class="camview" role="dialog" aria-modal="true" aria-label="Cámara" hidden>
+    <video id="camVideo" playsinline muted autoplay></video>
+    <div class="camguide" aria-hidden="true"></div>
+    <div class="camtop">
+      <span id="camTitle">Foto de la diana</span>
+      <button id="camClose" class="camclose" type="button" aria-label="Cerrar la cámara">×</button>
+    </div>
+    <div id="camMsg" class="cammsg" role="alert" hidden>
+      <span id="camMsgText"></span>
+      <label id="camSys" class="btn primary" for="cam">Usar la cámara del móvil</label>
+    </div>
+    <div class="cambot">
+      <span class="camhint">Centra la diana en el círculo, de frente y sin flash</span>
+      <button id="camShot" class="shutter" type="button" aria-label="Hacer la foto" disabled></button>
+    </div>
+  </div>
 
   <nav class="bnav" aria-label="Secciones">
     <button type="button" data-tab="puntuar" aria-current="page">
@@ -1736,7 +1789,7 @@ const Ses = {
 };
 
 /* ----- Estado de sesiones en la interfaz ----- */
-const SV = { tab:'puntuar', detailId:null, openTarget:null, formOpen:false, tipo:'competicion', warnCount:false, confirmDel:null };
+const SV = { tab:'puntuar', detailId:null, openTarget:null, formOpen:false, tipo:'competicion', fuente:null, warnCount:false, confirmDel:null };
 
 const VIEWS = { puntuar:'viewScore', sesiones:'viewSessions', estadisticas:'viewStats', ajustes:'viewSettings' };
 function setTab(tab){
@@ -1752,10 +1805,52 @@ function setTab(tab){
   try { window.scrollTo(0, 0); } catch (_) {}
 }
 
+/* ----- Origen de las fotos: cámara o galería, elegido una vez por sesión ----- */
+const FUENTES = ['camara', 'galeria'];
+function fuenteActual(){
+  const f = St.session ? St.session.fuente : null;
+  return FUENTES.includes(f) ? f : Cfg.fuente;
+}
+function setFuente(f){
+  if (!FUENTES.includes(f)) return;
+  Cfg.fuente = f; saveCfg();
+  if (St.session){ St.session.fuente = f; Ses.save(St.session); }
+  syncControls();
+}
+// Abre la cámara o la galería según lo elegido para la sesión
+function acquirePhoto(){
+  if (fuenteActual() === 'galeria'){ try { $('gal').click(); } catch (_) {} }
+  else openCamera();
+}
+function syncPhotoRow(){
+  const s = St.session, cargada = !!St.P && !St.sample;
+  const shoot = $('shootBtn'), gal = $('galBtn'), sw = $('switchSrc');
+  if (!s){
+    shoot.hidden = false; gal.hidden = false; $('sample').hidden = false; sw.hidden = true;
+    shoot.textContent = 'Hacer foto'; gal.textContent = 'Elegir de la galería';
+    shoot.classList.add('primary'); gal.classList.remove('primary');
+    return;
+  }
+  const n = s.targets.length + 1, f = fuenteActual();
+  $('sample').hidden = true; sw.hidden = false;
+  if (f === 'camara'){
+    shoot.hidden = false; gal.hidden = true;
+    shoot.textContent = cargada ? 'Repetir foto' : `Hacer foto de la diana ${n}`;
+    shoot.classList.toggle('primary', !cargada);
+    sw.textContent = 'Usar la galería';
+  } else {
+    shoot.hidden = true; gal.hidden = false;
+    gal.textContent = cargada ? 'Elegir otra foto' : `Elegir la diana ${n} de la galería`;
+    gal.classList.toggle('primary', !cargada);
+    sw.textContent = 'Usar la cámara';
+  }
+}
+
 /* ----- Barra de sesión en la pantalla de puntuar ----- */
 function syncSessionBar(){
   const s = St.session, bar = $('sesbar');
   $('discRow').hidden = !!s;
+  syncPhotoRow();
   if (!s){
     bar.classList.remove('activa');
     $('sesEyebrow').textContent = 'Sin sesión';
@@ -1777,7 +1872,8 @@ function syncSessionBar(){
   $('saveTarget').hidden = false; $('openSes').hidden = false; $('newSesQuick').hidden = true;
   $('saveTarget').textContent = `Guardar diana ${n}`;
   $('saveTarget').disabled = !St.cal;
-  $('emptyText').innerHTML = `<b>Diana ${n}${s.dianas ? ' de ' + s.dianas : ''}</b>Haz la foto o elígela de la galería.`;
+  $('emptyText').innerHTML = `<b>Diana ${n}${s.dianas ? ' de ' + s.dianas : ''}</b>` +
+    (fuenteActual() === 'galeria' ? `Pulsa «Elegir la diana ${n} de la galería».` : `Pulsa «Hacer foto de la diana ${n}» para abrir la cámara.`);
 }
 
 function clearStage(msg){
@@ -1837,7 +1933,9 @@ function saveTarget(){
     $('sesNotice').hidden = false;
     return;
   }
-  clearStage(`<b>Diana ${t.n} guardada: ${t.total} puntos (${fmt1(t.dec)}).</b> Haz la foto de la diana ${t.n + 1}.`);
+  clearStage(`<b>Diana ${t.n} guardada: ${t.total} puntos (${fmt1(t.dec)}).</b> ` +
+    (fuenteActual() === 'galeria' ? `Elige la diana ${t.n + 1}.` : `Haz la foto de la diana ${t.n + 1}.`));
+  acquirePhoto();   // la siguiente diana se abre sola con la cámara o la galería de la sesión
 }
 
 function startSession(){
@@ -1848,16 +1946,19 @@ function startSession(){
   if (SV.tipo === 'competicion' && !dianas){
     $('formMsg').textContent = 'En una competición indica cuántas dianas vas a tirar.'; $('formMsg').hidden = false; return;
   }
-  const s = { id: nuevoId(), nombre, tipo: SV.tipo, disc: $('fDisc').value, dianas: dianas || null, porDiana,
+  const fuente = FUENTES.includes(SV.fuente) ? SV.fuente : Cfg.fuente;
+  const s = { id: nuevoId(), nombre, tipo: SV.tipo, disc: $('fDisc').value, dianas: dianas || null, porDiana, fuente,
               notas: $('fNotas').value.trim(), creada: new Date().toISOString(), terminada: null, targets: [] };
   Ses.save(s);
   Store.set('activa', s.id);
+  Cfg.fuente = fuente; saveCfg();
   St.session = s;
   St.disc = s.disc; $('disc').value = s.disc; save();
-  SV.formOpen = false; $('formMsg').hidden = true;
+  SV.formOpen = false; SV.fuente = null; $('formMsg').hidden = true;
   $('fNombre').value = ''; $('fNotas').value = '';
   clearStage('');
   setTab('puntuar');
+  acquirePhoto();
 }
 
 function finishSession(id){
@@ -1874,6 +1975,105 @@ function resumeSession(id){
   St.disc = s.disc; $('disc').value = s.disc; save();
   clearStage('');
   setTab('puntuar');
+  acquirePhoto();
+}
+
+/* ===================== Cámara integrada =====================
+   Se dispara y la foto pasa directa a puntuar, sin pantalla de confirmar.
+   Si no sale bien, «Repetir foto» vuelve a abrir la cámara para la misma diana. */
+const Cam = { open:false, stream:null, token:0 };
+const camSupported = () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+
+function camStop(){
+  if (Cam.stream){ Cam.stream.getTracks().forEach(t => { try { t.stop(); } catch (_) {} }); Cam.stream = null; }
+  try { $('camVideo').srcObject = null; } catch (_) {}
+  $('camShot').disabled = true;
+}
+function camError(text){
+  camStop();
+  $('camMsgText').innerHTML = text;
+  $('camMsg').hidden = false;
+}
+async function camStart(){
+  const tk = ++Cam.token;
+  camStop();
+  $('camMsg').hidden = true;
+  if (!camSupported()){ camError('<b>Este móvil no deja usar la cámara dentro de la app.</b> Puedes usar la cámara del móvil.'); return; }
+  // Se pide la mejor resolución disponible; si el móvil no la admite, se baja el listón
+  const intentos = [
+    { audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:2560 }, height:{ ideal:1920 } } },
+    { audio:false, video:{ facingMode:{ ideal:'environment' } } },
+    { audio:false, video:true }
+  ];
+  let stream = null, err = null;
+  for (const c of intentos){
+    try { stream = await navigator.mediaDevices.getUserMedia(c); break; }
+    catch (e){ err = e; if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) break; }
+  }
+  if (tk !== Cam.token || !Cam.open){ if (stream) stream.getTracks().forEach(t => t.stop()); return; }
+  if (!stream){
+    camError(err && (err.name === 'NotAllowedError' || err.name === 'SecurityError')
+      ? '<b>No hay permiso para usar la cámara.</b> Dáselo a Puntuador en los ajustes de Android, o usa la cámara del móvil.'
+      : '<b>No he podido abrir la cámara.</b> Ciérrala y vuelve a probar, o usa la cámara del móvil.');
+    return;
+  }
+  Cam.stream = stream;
+  const tr = stream.getVideoTracks()[0];
+  try {
+    const cap = tr && tr.getCapabilities ? tr.getCapabilities() : {};
+    if (cap.focusMode && cap.focusMode.includes('continuous')) await tr.applyConstraints({ advanced:[{ focusMode:'continuous' }] });
+  } catch (_) {}
+  if (tk !== Cam.token) return;
+  const v = $('camVideo');
+  v.srcObject = stream;
+  const listo = () => { if (tk === Cam.token && Cam.stream && v.videoWidth) $('camShot').disabled = false; };
+  v.addEventListener('loadedmetadata', listo, { once:true });
+  v.addEventListener('playing', listo, { once:true });
+  try { await v.play(); } catch (_) {}
+  listo();
+}
+function openCamera(){
+  if (Cam.open) return;
+  if (!camSupported()){ try { $('cam').click(); } catch (_) {} return; }
+  Cam.open = true;
+  const s = St.session, n = s ? s.targets.length + 1 : 0;
+  $('camTitle').textContent = s ? (s.dianas ? `Diana ${n} de ${s.dianas}` : `Diana ${n}`) : 'Foto de la diana';
+  $('camView').hidden = false;
+  document.documentElement.classList.add('camopen');
+  camStart();
+}
+function closeCamera(){
+  Cam.open = false; Cam.token++;
+  camStop();
+  $('camMsg').hidden = true;
+  $('camView').hidden = true;
+  document.documentElement.classList.remove('camopen');
+}
+function takeShot(){
+  const v = $('camVideo');
+  if (!Cam.open || !Cam.stream || !v.videoWidth) return;
+  const c = document.createElement('canvas');
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  closeCamera();
+  if (SV.tab !== 'puntuar') setTab('puntuar');
+  loadSource(c, false);
+  try { window.scrollTo(0, 0); } catch (_) {}
+}
+function initCamera(){
+  $('shootBtn').addEventListener('click', openCamera);
+  $('galBtn').addEventListener('click', () => { try { $('gal').click(); } catch (_) {} });
+  $('switchSrc').addEventListener('click', () => setFuente(fuenteActual() === 'galeria' ? 'camara' : 'galeria'));
+  $('camShot').addEventListener('click', takeShot);
+  $('camClose').addEventListener('click', closeCamera);
+  // Cámara del sistema como último recurso: se cierra la nuestra justo después de abrirla
+  $('camSys').addEventListener('click', () => setTimeout(closeCamera, 0));
+  // Con la app en segundo plano se suelta la cámara; al volver se recupera
+  document.addEventListener('visibilitychange', () => {
+    if (!Cam.open) return;
+    if (document.hidden){ Cam.token++; camStop(); }
+    else camStart();
+  });
 }
 
 /* ----- Gráficas ----- */
@@ -1937,6 +2137,9 @@ function renderSessions(){
   $('newSesBtn').hidden = SV.formOpen;
   $('fTipoComp').setAttribute('aria-pressed', SV.tipo === 'competicion' ? 'true' : 'false');
   $('fTipoEnt').setAttribute('aria-pressed', SV.tipo === 'entreno' ? 'true' : 'false');
+  const fu = FUENTES.includes(SV.fuente) ? SV.fuente : Cfg.fuente;
+  $('fFuenteCam').setAttribute('aria-pressed', fu === 'camara' ? 'true' : 'false');
+  $('fFuenteGal').setAttribute('aria-pressed', fu === 'galeria' ? 'true' : 'false');
   $('presets').hidden = SV.tipo !== 'competicion';
   $('fDianasHint').textContent = SV.tipo === 'competicion' ? 'Obligatorio en competición.' : 'Déjalo vacío para un entreno sin límite.';
 
@@ -2114,9 +2317,11 @@ function initSessions(){
   }));
   $('newSesBtn').addEventListener('click', () => { SV.formOpen = true; $('fDisc').value = St.disc; renderSessions(); $('fNombre').focus(); });
   $('newSesQuick').addEventListener('click', () => { SV.detailId = null; SV.formOpen = true; $('fDisc').value = St.disc; setTab('sesiones'); });
-  $('formCancel').addEventListener('click', () => { SV.formOpen = false; $('formMsg').hidden = true; renderSessions(); });
+  $('formCancel').addEventListener('click', () => { SV.formOpen = false; SV.fuente = null; $('formMsg').hidden = true; renderSessions(); });
   $('fTipoComp').addEventListener('click', () => { SV.tipo = 'competicion'; if (!$('fDianas').value) $('fDianas').value = 12; renderSessions(); });
   $('fTipoEnt').addEventListener('click', () => { SV.tipo = 'entreno'; renderSessions(); });
+  $('fFuenteCam').addEventListener('click', () => { SV.fuente = 'camara'; renderSessions(); });
+  $('fFuenteGal').addEventListener('click', () => { SV.fuente = 'galeria'; renderSessions(); });
   $('presets').querySelectorAll('[data-d]').forEach(b => b.addEventListener('click', () => { $('fDianas').value = b.dataset.d; $('fPor').value = b.dataset.p; }));
   $('newForm').addEventListener('submit', e => { e.preventDefault(); startSession(); });
   $('backList').addEventListener('click', () => { SV.detailId = null; SV.openTarget = null; $('sesNotice').hidden = true; renderSessions(); try { window.scrollTo(0, 0); } catch (_) {} });
@@ -2124,6 +2329,7 @@ function initSessions(){
   $('openSes').addEventListener('click', () => { SV.detailId = St.session?.id || null; SV.openTarget = null; setTab('sesiones'); });
   // Botón atrás de Android: vuelve a la vista anterior antes de salir de la app
   window.onAndroidBack = () => {
+    if (Cam.open){ closeCamera(); return true; }
     if (SV.tab === 'estadisticas' || SV.tab === 'ajustes'){ setTab('puntuar'); return true; }
     if (SV.tab === 'sesiones'){
       if (SV.openTarget){ SV.openTarget = null; renderDetail(); return true; }
@@ -2553,7 +2759,7 @@ function initStats(){
 }
 
 /* ===================== Ajustes ===================== */
-const Cfg = { disc:'pistola', sensDef:60, tema:'sistema' };
+const Cfg = { disc:'pistola', sensDef:60, tema:'sistema', fuente:'camara' };
 
 function saveCfg(){ try { localStorage.setItem('puntuador', JSON.stringify(Cfg)); } catch (_) {} }
 function loadCfg(){
@@ -2564,6 +2770,7 @@ function loadCfg(){
     const sd = typeof o.sensDef === 'number' ? o.sensDef : o.sens;   // versiones anteriores guardaban «sens»
     if (typeof sd === 'number') Cfg.sensDef = Math.max(0, Math.min(100, Math.round(sd)));
     if (['sistema', 'claro', 'oscuro'].includes(o.tema)) Cfg.tema = o.tema;
+    if (['camara', 'galeria'].includes(o.fuente)) Cfg.fuente = o.fuente;
   } catch (_) {}
 }
 function applyTheme(){
@@ -2662,6 +2869,7 @@ function init(){
   initSessions();
   initStats();
   initSettings();
+  initCamera();
   if (window.matchMedia){
     try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (Cfg.tema === 'sistema') redrawCurrent(); }); } catch (_) {}
   }
