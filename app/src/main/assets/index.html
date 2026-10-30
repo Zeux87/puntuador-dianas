@@ -1305,7 +1305,7 @@ function render(){
   x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
   x.drawImage(P.canvas, 0, 0);
   drawOverlay(x, k, u);
-  if (St.drag && St.drag.p && St.z < 3) drawLoupe(x, k, u, W, H);
+  if (St.drag && St.drag.p) drawLoupe(x, k, u, W, H);
 }
 
 // Traza un anillo real (radio en mm) siguiendo la calibración de cada ángulo
@@ -1366,10 +1366,23 @@ function drawOverlay(x, k, u){
   }
 }
 
+// Lupa mientras se sujeta un impacto, con o sin zoom.
+// Amplía ×3 la foto entera y, con el zoom puesto, siempre al menos ×2 sobre lo que se ve.
 function drawLoupe(x, k, u, W, H){
-  const p = St.drag.p, z = 3, L = Math.min(W, H) * 0.19;
+  const p = St.drag.p, z = Math.max(2, 3 / St.z), L = Math.min(W, H) * 0.2, mg = 12 * u;
+  // Solo la parte de la foto que está en pantalla: si se ha bajado la página, la lupa baja con ella
+  let top = 0, bot = H;
+  try {
+    const b = $('view').getBoundingClientRect(), sc = W / (b.width || 1);
+    let vb = window.innerHeight || document.documentElement.clientHeight || 0;
+    const nav = document.querySelector('.bnav');
+    if (nav){ const nb = nav.getBoundingClientRect(); if (nb.top > vb / 2 && nb.top < vb) vb = nb.top; }
+    if (vb > 0){ top = Math.max(0, -b.top) * sc; bot = Math.min(b.height, vb - b.top) * sc; }
+    if (bot - top < 2 * (L + mg)){ top = 0; bot = H; }
+  } catch (_) {}
   const pcx = (p.x - St.r.x) * k;
-  const lx = pcx < W / 2 ? W - L - 12 * u : L + 12 * u, ly = L + 12 * u;
+  const lx = pcx < W / 2 ? W - L - mg : L + mg;
+  const ly = Math.max(L + mg, Math.min(H - L - mg, top + L + mg));
   x.save(); x.setTransform(1, 0, 0, 1, 0, 0);
   x.beginPath(); x.arc(lx, ly, L, 0, Math.PI * 2); x.clip();
   x.fillStyle = '#2b302f'; x.fillRect(lx - L, ly - L, 2 * L, 2 * L);
@@ -1444,7 +1457,8 @@ function onDown(e){
   if (hit >= 0){
     const sh = St.shots[hit];
     St.sel = hit;
-    St.drag = { i: hit, ox: sh.x - p.x, oy: sh.y - p.y, start: p, moved: false, p: null, x0: sh.x, y0: sh.y, dud0: sh.dudoso };
+    // La lupa sale en cuanto el dedo está sobre el impacto, aunque aún no se mueva
+    St.drag = { i: hit, ox: sh.x - p.x, oy: sh.y - p.y, start: p, moved: false, p: { x: sh.x, y: sh.y }, x0: sh.x, y0: sh.y, dud0: sh.dudoso };
     G.type = 'shot';
     update();
   } else if (St.mode === 'add'){
