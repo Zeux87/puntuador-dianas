@@ -10,8 +10,8 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 
 - Hace la foto con la cámara o la coge de la galería.
 - Localiza el negro de la diana y detecta los impactos.
-- Calcula total, decimal, dieces interiores, punto medio de impactos y agrupación.
-- Deja mover, añadir y eliminar impactos a mano, y calibrar la diana tocando el centro y el borde del negro.
+- Calcula total, decimal, media real por impacto (puntos enteros entre impactos, con la media decimal al lado), dieces interiores, punto medio de impactos y agrupación.
+- Deja mover, añadir y eliminar impactos a mano con botones sobre la propia foto (Añadir, Mover y Borrar, con flechas de ajuste fino encima de la imagen), y calibrar la diana tocando el centro y el borde del negro.
 - Zoom sobre la foto (pellizcar, doble toque o botones + y −) para ver de cerca los impactos juntos, y ajuste fino del impacto seleccionado con flechas, de 0,1 en 0,1 mm.
 - Guarda sesiones de entrenamiento y competición: nº de dianas, impactos por diana, foto de cada diana, totales, gráficas e histórico con la evolución.
 - Estadísticas del histórico: media, diámetro medio de agrupación, radio medio, deriva (nivel, dirección y constancia), dispersión horizontal y vertical, reparto por anillos, rendimiento a lo largo de la sesión y mejores marcas.

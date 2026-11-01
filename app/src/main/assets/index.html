@@ -86,6 +86,23 @@ select{background:var(--surface);border:1px solid var(--line);border-radius:8px;
 .zoombar button.zl{font-size:.95rem;font-variant-numeric:tabular-nums}
 .zoombar button:disabled{opacity:.4;cursor:default}
 .zoombar button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.editbar{position:absolute;left:10px;bottom:10px;display:flex;flex-direction:column;gap:6px;line-height:1}
+.editbar button{width:58px;height:50px;border-radius:10px;border:1px solid rgba(255,255,255,.28);background:rgba(16,20,21,.8);color:#fff;
+  font:600 .66rem var(--f-body);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0;-webkit-tap-highlight-color:transparent}
+.editbar button svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.editbar button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.editbar button.del:not(:disabled){color:#ffb27a;border-color:rgba(255,138,31,.6)}
+.editbar button:disabled{opacity:.4;cursor:default}
+.editbar button:focus-visible,.padov button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.padov{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:grid;grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,42px);gap:4px;line-height:1}
+.padov button{border-radius:10px;border:1px solid rgba(255,255,255,.28);background:rgba(16,20,21,.8);color:#fff;font:700 1.2rem var(--f-body);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;user-select:none;-webkit-user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent}
+.padov button:active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.padov .pv{grid-column:2;grid-row:2;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:10px;
+  background:rgba(16,20,21,.8);color:#fff;font:700 1rem var(--f-display);font-variant-numeric:tabular-nums;gap:2px}
+.padov .pv small{font:400 .58rem var(--f-body);color:#cdd3cc}
+.padov [data-dy="-1"]{grid-column:2;grid-row:1}.padov [data-dx="-1"]{grid-column:1;grid-row:2}
+.padov [data-dx="1"]{grid-column:3;grid-row:2}.padov [data-dy="1"]{grid-column:2;grid-row:3}
 .nudge{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;padding:8px 10px}
 .nudge .nl{display:flex;flex-direction:column;line-height:1.25;min-width:0}
 .nudge .nl small{color:var(--muted);font-size:.78rem}
@@ -350,6 +367,18 @@ html.camopen,html.camopen body{overflow:hidden}
           <button id="zFit" class="zl" type="button" aria-label="Quitar el zoom">×1</button>
           <button id="zOut" type="button" aria-label="Reducir">−</button>
         </div>
+        <div id="editBar" class="editbar" hidden>
+          <button id="eAdd" type="button" aria-pressed="false" aria-label="Añadir impactos tocando la foto"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Añadir</button>
+          <button id="eMove" type="button" aria-pressed="false" aria-label="Mostrar flechas para mover el impacto"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg>Mover</button>
+          <button id="eDel" class="del" type="button" aria-label="Borrar el impacto seleccionado"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Borrar</button>
+        </div>
+        <div id="padOv" class="padov" hidden>
+          <button type="button" data-dx="0" data-dy="-1" aria-label="Mover arriba">↑</button>
+          <button type="button" data-dx="-1" data-dy="0" aria-label="Mover a la izquierda">←</button>
+          <div class="pv"><span id="padVal">–</span><small id="padSel">1</small></div>
+          <button type="button" data-dx="1" data-dy="0" aria-label="Mover a la derecha">→</button>
+          <button type="button" data-dx="0" data-dy="1" aria-label="Mover abajo">↓</button>
+        </div>
       </div>
       <div id="nudge" class="nudge" hidden>
         <div class="nl">
@@ -387,7 +416,7 @@ html.camopen,html.camopen body{overflow:hidden}
           <li>Sin contraluz, los impactos en la zona blanca casi no se ven: añádelos tocando «+ Añadir impacto».</li>
           <li>Los dobles se marcan en naranja como dudosos. Revísalos y arrastra cada impacto a su sitio.</li>
           <li>Para ver los impactos de cerca, pellizca la foto, toca dos veces o usa los botones + y −. Con la foto ampliada, arrastra en una zona vacía para moverte.</li>
-          <li>Si un impacto no queda justo en el agujero, tócalo y ajústalo con las flechas de «Ajuste fino» (mantén pulsado para ir más rápido).</li>
+          <li>Sobre la foto tienes los botones Añadir, Mover y Borrar. Toca un impacto y muévelo con las flechas que salen sobre la foto, de 0,1 en 0,1 mm (mantén pulsado para ir más rápido).</li>
           <li>Si no localiza la diana, usa «Calibrar a mano»: toca el centro y después el borde del negro.</li>
           <li>La puntuación sigue la regla ISSF: cuenta el anillo más alto que toque el perdigón de 4,5 mm.</li>
         </ul>
@@ -497,7 +526,7 @@ html.camopen,html.camopen body{overflow:hidden}
 
       <div id="trendCard" class="card" hidden>
         <h2>Evolución</h2>
-        <p class="dmeta">Media por impacto en cada sesión terminada.</p>
+        <p class="dmeta">Media decimal por impacto en cada sesión terminada.</p>
         <canvas id="trend" class="chart" aria-label="Evolución de la media por impacto"></canvas>
       </div>
 
@@ -1188,6 +1217,7 @@ function clockOf(mx, my){
   return hr === 0 ? 12 : hr;
 }
 const fmt1 = v => v.toFixed(1).replace('.', ',');
+const fmt2 = v => v.toFixed(2).replace('.', ',');
 
 /* ===================== Interfaz ===================== */
 const St = { disc:'pistola', P:null, cal:null, calManual:false, shots:[], sel:-1, mode:'edit', calTmp:null,
@@ -1565,17 +1595,38 @@ function nudge(dx, dy){
   }
   update();
 }
+let padOn = true;
+try { padOn = localStorage.getItem('padOv') !== '0'; } catch (_) {}
+const editing = () => !!St.P && !!St.cal && St.mode !== 'cal1' && St.mode !== 'cal2';
 function syncNudge(info){
   const on = St.sel >= 0 && !!St.cal && !!info[St.sel];
-  $('nudge').hidden = !on;
+  const ov = on && padOn && editing();
+  $('padOv').hidden = !ov;
+  $('nudge').hidden = !on || ov;   // con las flechas sobre la foto no hace falta el panel de abajo
   if (!on) return;
   $('nudgeSel').textContent = 'Impacto ' + (St.sel + 1);
   $('nudgeVal').textContent = fmt1(info[St.sel].dec);
+  $('padVal').textContent = fmt1(info[St.sel].dec);
+  $('padSel').textContent = 'imp. ' + (St.sel + 1);
 }
+function syncEditBar(){
+  const on = editing(), sel = St.sel >= 0;
+  $('editBar').hidden = !on;
+  $('eAdd').setAttribute('aria-pressed', St.mode === 'add' ? 'true' : 'false');
+  $('eMove').disabled = !sel;
+  $('eMove').setAttribute('aria-pressed', sel && padOn ? 'true' : 'false');
+  $('eDel').disabled = !sel;
+}
+function toggleAdd(){
+  St.mode = St.mode === 'add' ? 'edit' : 'add';
+  if (St.mode === 'add') St.msg = 'Toca la foto donde esté cada impacto que falte. Pulsa otra vez «Añadir» para terminar.';
+  syncControls();
+}
+function delSel(){ if (St.sel < 0) return; St.shots.splice(St.sel, 1); St.sel = -1; update(); }
 function initNudge(){
   let tA = null, tB = null;
   const stop = () => { clearTimeout(tA); clearInterval(tB); tA = tB = null; };
-  $('nudgePad').querySelectorAll('button').forEach(b => {
+  document.querySelectorAll('#nudgePad button, #padOv button').forEach(b => {
     const dx = +b.dataset.dx, dy = +b.dataset.dy;
     b.addEventListener('pointerdown', e => {
       e.preventDefault(); stop(); nudge(dx, dy);
@@ -1600,6 +1651,7 @@ function syncControls(){
   $('addMode').setAttribute('aria-pressed', St.mode === 'add' ? 'true' : 'false');
   $('del').disabled = St.sel < 0;
   $('addMode').disabled = !St.cal;
+  syncEditBar();
   $('calib').disabled = !St.P; $('auto').disabled = !St.P;
   syncSessionBar();
   $('viewToggle').disabled = !St.cal;
@@ -1619,7 +1671,7 @@ function renderResults(){
   $('decTot').textContent = fmt1(dec);
   $('cnt').textContent = n;
   $('xs').textContent = d.x == null ? '–' : xs;
-  $('avg').textContent = n ? fmt1(dec / n) : '–';
+  $('avg').innerHTML = n ? `${fmt2(tot / n)}<small>decimal ${fmt1(dec / n)}</small>` : '–';
   $('best').textContent = n ? fmt1(Math.max(...info.map(s => s.dec))) : '–';
   let mpi = null;
   if (n){
@@ -1704,7 +1756,8 @@ function summaryText(){
   const xs = info.filter(s => s.x).length;
   let t = `${d.nombre} · ${n} impactos\nTotal: ${tot} de ${n * 10} (${fmt1(dec)} decimal)`;
   if (d.x != null) t += ` · ${xs} X`;
-  if (n) t += `\nImpactos: ${info.map(s => fmt1(s.dec)).join(' · ')}`;
+  if (n) t += ` · media ${fmt2(tot / n)}`;
+  if (n) t += `\nImpactos:${info.map(s => fmt1(s.dec)).join(' · ')}`;
   if (n){
     const mx = info.reduce((a, s) => a + s.mx, 0) / n, my = info.reduce((a, s) => a + s.my, 0) / n;
     t += `\nPunto medio: ${fmt1(Math.hypot(mx, my))} mm a las ${clockOf(mx, my)}`;
@@ -2164,7 +2217,7 @@ function renderSessions(){
     const li = document.createElement('li'), b = document.createElement('button');
     b.type = 'button';
     const max = e.max ?? (e.dianas || e.nT) * e.porDiana * 10;
-    const media = e.nShots ? fmt1(e.dec / e.nShots) : '–';
+    const media = e.nShots ? fmt2(e.total / e.nShots) : '–';
     const estado = e.id === act ? '<span class="pill live">En curso</span>' : (!e.terminada ? '<span class="pill">Sin terminar</span>' : '');
     b.innerHTML = `<span class="nm">${estado}<span class="pill ${e.tipo === 'competicion' ? 'comp' : ''}">${e.tipo === 'competicion' ? 'Competición' : 'Entreno'}</span>${esc(e.nombre)}</span>
       <span class="sc">${e.total}<small>de ${max}</small></span>
@@ -2209,7 +2262,7 @@ function renderDetail(){
       <dl class="facts f8">
         <div><dt>Dianas</dt><dd>${s.targets.length}${s.dianas ? '<small>de ' + s.dianas + '</small>' : ''}</dd></div>
         <div><dt>Impactos</dt><dd>${T.n}</dd></div>
-        <div><dt>Media</dt><dd>${T.n ? fmt1(T.dec / T.n) : '–'}<small>por impacto</small></dd></div>
+        <div><dt>Media</dt><dd>${T.n ? fmt2(T.total / T.n) : '–'}<small>${T.n ? 'por impacto · decimal ' + fmt1(T.dec / T.n) : 'por impacto'}</small></dd></div>
         <div><dt>Mejor diana</dt><dd>${best ? best.total : '–'}${best ? '<small>la ' + best.n + 'ª</small>' : ''}</dd></div>
         <div><dt>Peor diana</dt><dd>${worst ? worst.total : '–'}${worst ? '<small>la ' + worst.n + 'ª</small>' : ''}</dd></div>
         <div><dt>${d.x != null ? 'Dieces interiores' : 'Dieces'}</dt><dd>${d.x != null ? T.xs : shots.filter(p => p.int === 10).length}</dd></div>
@@ -2310,7 +2363,7 @@ function sessionText(s){
   let t = `${s.nombre} · ${s.tipo === 'competicion' ? 'Competición' : 'Entrenamiento'} · ${d.nombre}\n${fechaCorta(s.creada)} · ${s.targets.length}${s.dianas ? ' de ' + s.dianas : ''} dianas × ${s.porDiana} impactos\n`;
   t += `Total: ${T.total} de ${maxOf(s)} (${fmt1(T.dec)} decimal)`;
   if (d.x != null) t += ` · ${T.xs} X`;
-  if (T.n) t += ` · media ${fmt1(T.dec / T.n)}`;
+  if (T.n) t += ` · media ${fmt2(T.total / T.n)} (decimal ${fmt1(T.dec / T.n)})`;
   if (s.targets.length) t += `\nDianas: ${s.targets.map(x => x.total).join(' · ')}`;
   if (s.notas) t += `\nNotas: ${s.notas}`;
   return t;
@@ -2474,7 +2527,7 @@ function computeStats(list, d){
 function statsReading(st){
   const d = st.d, out = [];
   const ns = st.ses.length;
-  out.push(`En ${ns === 1 ? '1 sesión' : ns + ' sesiones'} (${st.N} impactos) haces <b>${fmt1(st.media)} de media por impacto</b>, unos ${Math.round(st.mediaInt * 60)} puntos sobre 600.`);
+  out.push(`En ${ns === 1 ? '1 sesión' : ns + ' sesiones'} (${st.N} impactos) haces <b>${fmt2(st.mediaInt)} de media por impacto</b> (${fmt1(st.media)} en decimal), unos ${Math.round(st.mediaInt * 60)} puntos sobre 600.`);
   if (st.cmp){
     const c = st.cmp, partes = [];
     if (Math.abs(c.media) >= 0.05) partes.push(`tu media ${c.media > 0 ? 'sube' : 'baja'} ${fmt1(Math.abs(c.media))} por impacto`);
@@ -2694,7 +2747,7 @@ function renderStats(){
 
     <div class="card">
       <dl class="facts f8">
-        <div><dt>Media por impacto</dt><dd>${fmt1(st.media)}<small>≈ ${Math.round(st.mediaInt * 60)} / 600</small></dd></div>
+        <div><dt>Media por impacto</dt><dd>${fmt2(st.mediaInt)}<small>decimal ${fmt1(st.media)} · ≈ ${Math.round(st.mediaInt * 60)} / 600</small></dd></div>
         <div><dt>Diámetro medio</dt><dd>${st.diam != null ? fmt1(st.diam) + ' mm' : '–'}<small>agrupación por diana, centro a centro</small></dd></div>
         <div><dt>Radio medio</dt><dd>${st.rmed != null ? fmt1(st.rmed) + ' mm' : '–'}<small>de cada impacto a su punto medio</small></dd></div>
         <div><dt>Deriva media</dt><dd>${fmt1(st.deriva)} mm<small><span class="lv lv-${lv}">${lv}</span></small></dd></div>
@@ -2709,7 +2762,7 @@ function renderStats(){
     <div class="card">
       <h2>Evolución por sesión</h2>
       <div class="charts3">
-        <div><p class="eyebrow">Media por impacto</p><canvas id="chMedia" class="chart"></canvas></div>
+        <div><p class="eyebrow">Media decimal por impacto</p><canvas id="chMedia" class="chart"></canvas></div>
         <div><p class="eyebrow">Diámetro medio (mm)</p><canvas id="chDiam" class="chart"></canvas></div>
         <div><p class="eyebrow">Deriva (mm)</p><canvas id="chDer" class="chart"></canvas></div>
       </div>
@@ -2908,8 +2961,11 @@ function init(){
     St.sens = +e.target.value; $('sensOut').textContent = St.sens; save();
     clearTimeout(tmr); tmr = setTimeout(() => { if (St.cal) redetect(St.sample ? 'Foto de ejemplo.' : ''); }, 220);
   });
-  $('addMode').addEventListener('click', () => { St.mode = St.mode === 'add' ? 'edit' : 'add'; if (St.mode === 'add') St.msg = 'Toca la foto donde esté cada impacto que falte. Pulsa otra vez el botón para terminar.'; syncControls(); });
-  $('del').addEventListener('click', () => { if (St.sel < 0) return; St.shots.splice(St.sel, 1); St.sel = -1; update(); });
+  $('addMode').addEventListener('click', toggleAdd);
+  $('del').addEventListener('click', delSel);
+  $('eAdd').addEventListener('click', toggleAdd);
+  $('eDel').addEventListener('click', delSel);
+  $('eMove').addEventListener('click', () => { padOn = !padOn; try { localStorage.setItem('padOv', padOn ? '1' : '0'); } catch (_) {} update(); });
   $('calib').addEventListener('click', () => { St.mode = 'cal1'; St.calTmp = null; St.view = 'full'; resetZoom(); banner('Toca el centro de la diana.'); update(); });
   $('bannerCancel').addEventListener('click', () => { St.mode = 'edit'; St.calTmp = null; banner(null); if (St.cal) St.view = 'target'; resetZoom(); update(); });
   $('auto').addEventListener('click', () => { St.calManual = false; analyze(St.sample ? 'Foto de ejemplo.' : ''); });
