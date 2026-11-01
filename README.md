@@ -9,7 +9,9 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 ## Qué hace
 
 - Hace la foto con la cámara o la coge de la galería.
-- Localiza el negro de la diana y detecta los impactos.
+- Localiza el negro de la diana y detecta los impactos sobre la foto original a resolución completa, encajando círculos del tamaño real del perdigón (4,5 mm). Separa los impactos juntos buscando el arco de cada agujero en el borde del grupo.
+- Si la sesión indica cuántos impactos lleva cada diana y faltan, propone en naranja los candidatos más probables; si sobran, marca en naranja los menos claros.
+- Mide su propia calidad: guarda con cada diana lo que detectó y lo compara con cómo la guardaste (Estadísticas → Calidad de la detección).
 - Calcula total, decimal, media real por impacto (puntos enteros entre impactos, con la media decimal al lado), dieces interiores, punto medio de impactos y agrupación.
 - Deja mover, añadir y eliminar impactos a mano con botones sobre la propia foto (Añadir, Mover y Borrar, con flechas de ajuste fino encima de la imagen), y calibrar la diana tocando el centro y el borde del negro.
 - Zoom sobre la foto (pellizcar, doble toque o botones + y −) para ver de cerca los impactos juntos, y ajuste fino del impacto seleccionado con flechas, de 0,1 en 0,1 mm.
@@ -23,6 +25,7 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 - `app/src/main/assets/index.html`: toda la lógica de detección y la interfaz.
 - `app/src/main/java/es/pablo/puntuador/MainActivity.java`: la ventana Android que muestra la página y abre la cámara o la galería.
 - `.github/workflows/compilar-apk.yml`: compila y publica el APK.
+- `herramientas/banco-deteccion.js`: banco de pruebas con dianas sintéticas para medir la detección antes y después de cada cambio.
 
 ## Actualizaciones
 
