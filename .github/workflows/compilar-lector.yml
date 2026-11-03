@@ -1,0 +1,79 @@
+name: Compilar lector
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lector/**'
+      - '.github/workflows/compilar-lector.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  compilar:
+    runs-on: ubuntu-latest
+    env:
+      URL_ESP32: https://espressif.github.io/arduino-esp32/package_esp32_index.json
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar arduino-cli
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Instalar el núcleo ESP32
+        run: |
+          arduino-cli core update-index --additional-urls "$URL_ESP32"
+          arduino-cli core install esp32:esp32 --additional-urls "$URL_ESP32"
+          arduino-cli core list
+
+      - name: Compilar para XIAO ESP32S3 Sense
+        run: |
+          set -o pipefail
+          arduino-cli compile --fqbn esp32:esp32:XIAO_ESP32S3:PSRAM=opi \
+            --warnings default --output-dir salida/xiao lector 2>&1 | tee -a compilacion.log
+          ls -la salida/xiao
+
+      - name: Compilar para ESP32-CAM AI-Thinker
+        run: |
+          set -o pipefail
+          arduino-cli compile --fqbn esp32:esp32:esp32cam:PartitionScheme=huge_app \
+            --warnings default --output-dir salida/aithinker lector 2>&1 | tee -a compilacion.log
+          ls -la salida/aithinker
+
+      - name: Mostrar errores de compilación
+        if: failure()
+        run: |
+          grep -E "error|Error" -A 2 compilacion.log | head -n 60 | while IFS= read -r l; do
+            echo "::error::${l//%/%25}"
+          done
+
+      - name: Preparar los binarios
+        run: |
+          mkdir -p bin
+          cp salida/xiao/lector.ino.merged.bin bin/Lector-XIAO-ESP32S3.bin
+          cp salida/aithinker/lector.ino.merged.bin bin/Lector-ESP32-CAM.bin
+          ls -la bin
+
+      - name: Guardar los binarios en la ejecución
+        uses: actions/upload-artifact@v4
+        with:
+          name: lector-firmware
+          path: bin/*.bin
+
+      # Versión aparte marcada como «pre-release» para que la app no la tome por una actualización
+      - name: Publicar el firmware
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTAS="Firmware del lector de impactos. Grábalo en la dirección 0x0 (archivo completo) con https://espressif.github.io/esptool-js/ desde Chrome en el ordenador. Lector-XIAO-ESP32S3.bin para la Seeed XIAO ESP32S3 Sense; Lector-ESP32-CAM.bin para la ESP32-CAM AI-Thinker. Compilación ${{ github.run_number }}."
+          if gh release view lector >/dev/null 2>&1; then
+            gh release upload lector bin/*.bin --clobber
+            gh release edit lector --notes "$NOTAS" --prerelease
+          else
+            gh release create lector bin/*.bin --title "Lector de impactos (firmware ESP32)" --notes "$NOTAS" --prerelease --latest=false
+          fi

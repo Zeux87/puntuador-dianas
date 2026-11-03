@@ -19,6 +19,7 @@ import android.util.JsonReader;
 import android.util.JsonToken;
 import android.util.JsonWriter;
 import android.view.View;
+import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
@@ -69,6 +70,9 @@ public class MainActivity extends Activity {
     private Uri fotoUri;
     // Petición de cámara de la página que espera a que Android conceda el permiso
     private PermissionRequest permisoWeb;
+
+    // Lector de impactos WiFi (ESP32 junto a la diana)
+    private Lector lector;
 
     // Datos de la última versión encontrada en GitHub
     private volatile String urlApk = null;
@@ -141,8 +145,34 @@ public class MainActivity extends Activity {
             }
         });
 
+        lector = new Lector(this, new Lector.Oyente() {
+            @Override
+            public void estado(JSONObject o) {
+                llamarJs("onLectorEstado", o.toString());
+            }
+
+            @Override
+            public void evento(JSONObject o) {
+                llamarJs("onLectorEvento", o.toString());
+            }
+        });
+
         aplicarTema("sistema");
         web.loadUrl("file:///android_asset/index.html");
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (lector != null) lector.desconectar();
+        super.onDestroy();
+    }
+
+    // Con el lector conectado la pantalla no se apaga sola
+    private void pantallaEncendida(boolean si) {
+        runOnUiThread(() -> {
+            if (si) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        });
     }
 
     /* ---------------- Tema: colores de las barras del sistema ---------------- */
@@ -681,6 +711,28 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void installUpdate() {
             instalarActualizacion();
+        }
+
+        @JavascriptInterface
+        public void lectorConectar() {
+            pantallaEncendida(true);
+            lector.conectar();
+        }
+
+        @JavascriptInterface
+        public void lectorDesconectar() {
+            pantallaEncendida(false);
+            lector.desconectar();
+        }
+
+        @JavascriptInterface
+        public void lectorReferencia() {
+            lector.referencia();
+        }
+
+        @JavascriptInterface
+        public void lectorAjustes(String consulta) {
+            if (consulta != null && consulta.matches("[a-z]+=[0-9]+(&[a-z]+=[0-9]+)*")) lector.ajustes(consulta);
         }
     }
 }

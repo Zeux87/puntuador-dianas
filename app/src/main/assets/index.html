@@ -194,6 +194,11 @@ pre.fallback{white-space:pre-wrap;background:var(--bg);border:1px solid var(--li
 .progress{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
 .progress i{display:block;height:100%;width:0;background:var(--accent)}
 .warnmsg{color:var(--warn);font-weight:600;font-size:.9rem;margin:0}
+.lecbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0 0;font-size:.9rem;color:var(--muted)}
+.lecbar .txt{flex:1 1 180px;min-width:0}
+.lecbar .txt b{color:var(--ink);font-weight:600}
+.lecdot{width:10px;height:10px;border-radius:50%;background:var(--warn);flex:none}
+.lecdot.ok{background:#35c76a}
 .empty-stage{aspect-ratio:1;max-width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#cdd3cc;text-align:center;padding:24px;line-height:1.4;font-size:.95rem}
 .empty-stage b{display:block;font-family:var(--f-display);font-size:1.7rem;color:#ffffff;margin-bottom:4px}
 .sesview{display:flex;flex-direction:column;gap:14px;max-width:880px;width:100%;margin:0 auto}
@@ -354,8 +359,15 @@ html.camopen,html.camopen body{overflow:hidden}
         <button id="galBtn" class="btn" type="button">Elegir de la galería</button>
         <button id="sample" class="btn" type="button">Ver ejemplo</button>
         <button id="switchSrc" class="btn" type="button" hidden>Usar la galería</button>
+        <button id="lecBtn" class="btn" type="button">Lector WiFi</button>
         <input id="cam" type="file" accept="image/*" capture="environment" hidden>
         <input id="gal" type="file" accept="image/*" hidden>
+      </div>
+      <div class="lecbar" id="lecBar" hidden>
+        <span class="lecdot" id="lecDot" aria-hidden="true"></span>
+        <span class="txt" id="lecTexto" role="status"></span>
+        <button id="lecRef" class="btn" type="button">Releer diana</button>
+        <button id="lecOff" class="btn" type="button">Desconectar</button>
       </div>
 
       <div class="canvas-wrap" id="cwrap">
@@ -493,8 +505,9 @@ html.camopen,html.camopen body{overflow:hidden}
           <div class="row">
             <button id="fFuenteCam" class="btn" type="button" aria-pressed="true">Con la cámara</button>
             <button id="fFuenteGal" class="btn" type="button" aria-pressed="false">De la galería</button>
+            <button id="fFuenteLec" class="btn" type="button" aria-pressed="false">Con el lector WiFi</button>
           </div>
-          <small>Se usa para todas las dianas de la sesión. Al guardar una diana se abre sola para la siguiente.</small>
+          <small>Se usa para todas las dianas de la sesión. Al guardar una diana se abre sola para la siguiente. Con el lector WiFi cada impacto se marca solo, en orden.</small>
         </div>
         <div class="chips" id="presets" aria-label="Formatos habituales">
           <button class="chip" type="button" data-d="12" data-p="5">60 disparos · 12 × 5</button>
@@ -2089,6 +2102,7 @@ function summaryText(){
 }
 
 function loadSource(src, isSample){
+  St.lector = false;
   St.sens = Cfg.sensDef;
   if ($('sens')){ $('sens').value = St.sens; $('sensOut').textContent = St.sens; }
   St.P = prepare(src); St.src = src; St.hi = null; St.det = null; St.cal = null; St.calManual = false; St.sample = isSample;
@@ -2197,33 +2211,45 @@ function setTab(tab){
 }
 
 /* ----- Origen de las fotos: cámara o galería, elegido una vez por sesión ----- */
-const FUENTES = ['camara', 'galeria'];
+const FUENTES = ['camara', 'galeria', 'lector'];
 function fuenteActual(){
   const f = St.session ? St.session.fuente : null;
   return FUENTES.includes(f) ? f : Cfg.fuente;
 }
 function setFuente(f){
   if (!FUENTES.includes(f)) return;
+  if (f !== 'lector' && Lec.on) lectorDesconectar();
   Cfg.fuente = f; saveCfg();
   if (St.session){ St.session.fuente = f; Ses.save(St.session); }
   syncControls();
 }
 // Abre la cámara o la galería según lo elegido para la sesión
 function acquirePhoto(){
-  if (fuenteActual() === 'galeria'){ try { $('gal').click(); } catch (_) {} }
+  const f = fuenteActual();
+  if (f === 'galeria'){ try { $('gal').click(); } catch (_) {} }
+  else if (f === 'lector') lectorSiguiente();
   else openCamera();
 }
 function syncPhotoRow(){
   const s = St.session, cargada = !!St.P && !St.sample;
-  const shoot = $('shootBtn'), gal = $('galBtn'), sw = $('switchSrc');
+  const shoot = $('shootBtn'), gal = $('galBtn'), sw = $('switchSrc'), lec = $('lecBtn');
+  syncLectorBar();
   if (!s){
     shoot.hidden = false; gal.hidden = false; $('sample').hidden = false; sw.hidden = true;
     shoot.textContent = 'Hacer foto'; gal.textContent = 'Elegir de la galería';
-    shoot.classList.add('primary'); gal.classList.remove('primary');
+    shoot.classList.toggle('primary', !Lec.on); gal.classList.remove('primary');
+    lec.hidden = Lec.on; lec.textContent = 'Lector WiFi'; lec.classList.remove('primary');
     return;
   }
   const n = s.targets.length + 1, f = fuenteActual();
   $('sample').hidden = true; sw.hidden = false;
+  if (f === 'lector'){
+    shoot.hidden = true; gal.hidden = true;
+    lec.hidden = Lec.on; lec.textContent = 'Conectar el lector'; lec.classList.add('primary');
+    sw.textContent = 'Usar la cámara';
+    return;
+  }
+  lec.hidden = false; lec.textContent = 'Usar el lector WiFi'; lec.classList.remove('primary');
   if (f === 'camara'){
     shoot.hidden = false; gal.hidden = true;
     shoot.textContent = cargada ? 'Repetir foto' : `Hacer foto de la diana ${n}`;
@@ -2250,7 +2276,8 @@ function syncSessionBar(){
     $('sesProgress').hidden = true;
     $('saveTarget').hidden = true; $('openSes').hidden = true; $('newSesQuick').hidden = false;
     $('sesWarn').hidden = true;
-    $('emptyText').innerHTML = '<b>Haz la foto de la diana</b>Pulsa «Hacer foto» o elige una de la galería.';
+    $('emptyText').innerHTML = Lec.on ? '<b>Lector WiFi</b>Esperando la imagen de la diana…'
+      : '<b>Haz la foto de la diana</b>Pulsa «Hacer foto» o elige una de la galería.';
     return;
   }
   const n = s.targets.length + 1, tot = totalsOf(s.targets.flatMap(t => t.shots));
@@ -2263,11 +2290,15 @@ function syncSessionBar(){
   $('saveTarget').hidden = false; $('openSes').hidden = false; $('newSesQuick').hidden = true;
   $('saveTarget').textContent = `Guardar diana ${n}`;
   $('saveTarget').disabled = !St.cal;
+  const fa = fuenteActual();
   $('emptyText').innerHTML = `<b>Diana ${n}${s.dianas ? ' de ' + s.dianas : ''}</b>` +
-    (fuenteActual() === 'galeria' ? `Pulsa «Elegir la diana ${n} de la galería».` : `Pulsa «Hacer foto de la diana ${n}» para abrir la cámara.`);
+    (fa === 'galeria' ? `Pulsa «Elegir la diana ${n} de la galería».`
+      : fa === 'lector' ? (Lec.on ? 'Pon la diana en el portablancos: el lector la verá sola.' : 'Pulsa «Conectar el lector».')
+      : `Pulsa «Hacer foto de la diana ${n}» para abrir la cámara.`);
 }
 
 function clearStage(msg){
+  St.lector = false;
   St.P = null; St.src = null; St.hi = null; St.det = null; St.cal = null; St.shots = []; St.sel = -1; St.sample = false; St.mode = 'edit'; St.calTmp = null;
   resetZoom(); banner(null);
   St.msg = msg || '';
@@ -2326,7 +2357,9 @@ function saveTarget(){
     return;
   }
   clearStage(`<b>Diana ${t.n} guardada: ${t.total} puntos (${fmt1(t.dec)}).</b> ` +
-    (fuenteActual() === 'galeria' ? `Elige la diana ${t.n + 1}.` : `Haz la foto de la diana ${t.n + 1}.`));
+    (fuenteActual() === 'galeria' ? `Elige la diana ${t.n + 1}.`
+      : fuenteActual() === 'lector' ? `Cambia la diana: el lector cogerá la ${t.n + 1} sola.`
+      : `Haz la foto de la diana ${t.n + 1}.`));
   acquirePhoto();   // la siguiente diana se abre sola con la cámara o la galería de la sesión
 }
 
@@ -2455,7 +2488,7 @@ function takeShot(){
 function initCamera(){
   $('shootBtn').addEventListener('click', openCamera);
   $('galBtn').addEventListener('click', () => { try { $('gal').click(); } catch (_) {} });
-  $('switchSrc').addEventListener('click', () => setFuente(fuenteActual() === 'galeria' ? 'camara' : 'galeria'));
+  $('switchSrc').addEventListener('click', () => setFuente(fuenteActual() === 'camara' ? 'galeria' : 'camara'));
   $('camShot').addEventListener('click', takeShot);
   $('camClose').addEventListener('click', closeCamera);
   // Cámara del sistema como último recurso: se cierra la nuestra justo después de abrirla
@@ -2469,6 +2502,274 @@ function initCamera(){
 }
 
 /* ----- Gráficas ----- */
+/* ===================== Lector de impactos WiFi =====================
+   Un ESP32 con cámara junto a la diana avisa cada vez que aparece un agujero nuevo y manda la foto.
+   La app compara esa foto con la anterior (la cámara está quieta) para encontrar el impacto nuevo
+   y lo añade al final, así los impactos quedan numerados en el orden en que se dispararon. */
+const LECTOR_URL = 'http://192.168.4.1';
+const Lec = { on:false, estado:'apagado', texto:'', info:null, base:null, pend:null, orden:0, web:0 };
+const lectorNativo = () => !!(window.AndroidApp && window.AndroidApp.lectorConectar);
+
+function lectorConectar(){
+  Lec.on = true; Lec.estado = 'buscando'; Lec.texto = 'Buscando el lector…';
+  if (lectorNativo()){ try { window.AndroidApp.lectorConectar(); } catch (_) {} }
+  else lectorWeb();
+  if (!St.lector && (!St.P || St.sample)){ clearStage(''); }
+  syncControls();
+}
+function lectorDesconectar(){
+  Lec.on = false; Lec.estado = 'apagado'; Lec.pend = null; Lec.web++;
+  if (lectorNativo()){ try { window.AndroidApp.lectorDesconectar(); } catch (_) {} }
+  syncControls();
+}
+function lectorReleer(){
+  if (lectorNativo()){ try { window.AndroidApp.lectorReferencia(); } catch (_) {} }
+  else fetch(LECTOR_URL + '/referencia').catch(() => {});
+}
+// Al empezar una diana con el lector: la que esté esperando, o conectar si hace falta
+function lectorSiguiente(){
+  if (!Lec.on){ lectorConectar(); return; }
+  if (Lec.pend){ const im = Lec.pend; Lec.pend = null; lectorCargar(im); }
+}
+
+function syncLectorBar(){
+  const bar = $('lecBar'); if (!bar) return;
+  bar.hidden = !Lec.on;
+  if (!Lec.on) return;
+  $('lecDot').classList.toggle('ok', Lec.estado === 'conectado');
+  let t = Lec.texto;
+  if (Lec.estado === 'conectado'){
+    const i = Lec.info || {};
+    t = `<b>Lector conectado</b> · ${i.sensor || 'cámara'} ${i.ancho ? i.ancho + '×' + i.alto : ''}`;
+    if (Lec.pend) t += ' · <b>diana nueva esperando</b>: guarda la actual';
+  }
+  $('lecTexto').innerHTML = t;
+  $('lecRef').disabled = Lec.estado !== 'conectado';
+}
+
+// Avisos de la parte Android
+window.onLectorEstado = o => {
+  if (!Lec.on && o.estado !== 'desconectado') return;
+  if (o.estado === 'desconectado'){ Lec.on = false; Lec.estado = 'apagado'; }
+  else { Lec.estado = o.estado; if (o.texto) Lec.texto = o.texto; if (o.info) Lec.info = o.info; }
+  syncPhotoRow();
+};
+window.onLectorEvento = o => {
+  if (!Lec.on || !o || !o.foto) return;
+  const im = new Image();
+  im.onload = () => lectorEvento(o, im);
+  im.src = o.foto;
+};
+
+function lectorEvento(o, im){
+  if (!Lec.on) return;
+  if (St.drag){ setTimeout(() => lectorEvento(o, im), 300); return; }   // no cambiar la foto mientras se mueve un impacto
+  if (St.session && fuenteActual() !== 'lector') return;
+  const enPantalla = St.lector && St.P;
+  if (o.tipo === 'impacto' && enPantalla && St.cal){ lectorImpacto(o, im); return; }
+  if (o.tipo === 'impacto' && enPantalla){ lectorCargar(im); return; }
+  if (o.tipo === 'conexion' && enPantalla && St.cal){ lectorRebase(im); return; }
+  // Diana nueva. Si la actual tiene impactos sin guardar en una sesión, la nueva espera a que se guarde
+  if (enPantalla && St.session && St.shots.length && !o.manual){
+    Lec.pend = im;
+    St.msg = '<b>El lector ve una diana nueva.</b> Guarda esta diana y se cargará la siguiente.';
+    syncControls();
+    return;
+  }
+  Lec.pend = null;
+  lectorCargar(im);
+}
+
+function lectorCargar(im){
+  if (SV.tab !== 'puntuar') setTab('puntuar');
+  loadSource(im, false);
+  St.lector = true;
+  Lec.base = im; Lec.orden = 0;
+}
+
+// Misma diana, foto nueva (al reconectar): se conserva todo y solo se cambia la imagen
+function lectorRebase(im){
+  const P = prepare(im);
+  if (P.w !== St.P.w || P.h !== St.P.h){ lectorCargar(im); return; }
+  P.t0 = St.P.t0; St.P = P; St.src = im; St.hi = null; Lec.base = im;
+  update();
+}
+
+function lectorImpacto(o, im){
+  const d = D(), P = prepare(im);
+  if (P.w !== St.P.w || P.h !== St.P.h){ lectorCargar(im); return; }
+  // Posición aproximada que ha visto el lector (a 1/8 de resolución): acota la búsqueda
+  const pista = o.x > 0 && o.y > 0 ? { x: o.x * P.w, y: o.y * P.h } : null;
+  let r = null;
+  try { r = lectorLocaliza(Lec.base, im, St.P, St.cal, d, pista); } catch (_) { r = null; }
+  // Si el papel se ha movido un poco con el impacto, se mueven con él la calibración y los impactos
+  if (r && Math.hypot(r.dx, r.dy) * r.k >= 0.75){
+    for (const k of ['cx', 'cx0']) if (St.cal[k] != null) St.cal[k] += r.dx;
+    for (const k of ['cy', 'cy0']) if (St.cal[k] != null) St.cal[k] += r.dy;
+    St.shots.forEach(sh => { sh.x += r.dx; sh.y += r.dy; });
+  }
+  P.t0 = St.P.t0; St.P = P; St.src = im; St.hi = null; Lec.base = im;
+  if (!r || !r.ok){
+    // El lector ha visto algo pero en la foto no se distingue: se propone su posición aproximada
+    const hmm = pista ? toMM(St.cal, d.negro, pista.x, pista.y) : null;
+    const dentro = hmm && Math.hypot(hmm.x, hmm.y) < outerR(d) + 15;
+    if (r && r.cand) lectorAnadir(r.x, r.y, true);
+    else if (dentro) lectorAnadir(pista.x, pista.y, true);
+    else { St.msg = '<b>El lector ha notado un cambio, pero no encuentro un impacto nuevo.</b> Si has disparado, añádelo con «Añadir».'; update(); }
+    return;
+  }
+  lectorAnadir(r.x, r.y, r.conf < 0.6);
+}
+
+function lectorAnadir(x, y, dudoso){
+  const sh = { x, y, id: St.nextId++, lector: true, orden: ++Lec.orden };
+  if (dudoso) sh.dudoso = true;
+  St.shots.push(sh); St.sel = -1;
+  const i = shotInfo(sh), n = St.shots.length, exp = expectedCount();
+  if (St.det) St.det.push([round2(i.mx), round2(i.my), dudoso ? 1 : 0]);
+  let m = `<b>Impacto ${n}: ${fmt1(i.dec)}</b>${i.x ? ' (X)' : ''} a las ${clockOf(i.mx, i.my)}. `;
+  if (dudoso) m += 'En naranja: no lo veo claro, compruébalo. ';
+  if (exp && n >= exp) m += `<b>Diana completa (${exp}).</b> Guárdala y cambia la diana. `;
+  St.msg = m;
+  update();
+}
+
+// Busca el agujero nuevo comparando dos fotos de la misma cámara (A antes, B después).
+// Devuelve la posición en píxeles de St.P, el desplazamiento del papel y lo claro que se ve.
+function lectorLocaliza(A, B, P, cal, d, pista){
+  const sw = B.naturalWidth || B.width, f = sw / P.w;
+  const hrP = PELLET * (cal.a + cal.b) / 2 / d.negro;
+  const ext = Math.max(cal.a, cal.b) * (outerR(d) + PELLET + 4) / d.negro * 1.1;
+  const x0 = Math.max(0, Math.floor(cal.cx - ext)), y0 = Math.max(0, Math.floor(cal.cy - ext));
+  const x1 = Math.min(P.w, Math.ceil(cal.cx + ext)), y1 = Math.min(P.h, Math.ceil(cal.cy + ext));
+  const cw = x1 - x0, ch = y1 - y0;
+  if (cw < 8 || ch < 8) return null;
+  const k = Math.min(f, 7 / hrP, 1100 / Math.max(cw, ch));     // radio del perdigón de unos 7 px
+  const W = Math.max(8, Math.round(cw * k)), H = Math.max(8, Math.round(ch * k));
+  const gris = src => {
+    const c = newCanvas(W, H), x = c.getContext('2d', { willReadFrequently:true });
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(src, x0 * f, y0 * f, cw * f, ch * f, 0, 0, W, H);
+    const dd = x.getImageData(0, 0, W, H).data, g = new Float32Array(W * H);
+    for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = (dd[j] * 77 + dd[j + 1] * 150 + dd[j + 2] * 29) / 256;
+    return g;
+  };
+  const ga = gris(A), gb = gris(B);
+  // Desplazamiento del papel entre fotos (en píxeles de trabajo), probando ±3
+  const M = 5;
+  let best = { e: Infinity, dx: 0, dy: 0 };
+  for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){
+    let e = 0, n = 0, sa = 0, sb = 0;
+    for (let y = M; y < H - M; y += 3) for (let x = M; x < W - M; x += 3){ sa += ga[(y + dy) * W + x + dx]; sb += gb[y * W + x]; n++; }
+    const off = (sb - sa) / n;
+    for (let y = M; y < H - M; y += 3) for (let x = M; x < W - M; x += 3) e += Math.abs(gb[y * W + x] - ga[(y + dy) * W + x + dx] - off);
+    e /= n;
+    if (e < best.e - 1e-6 || (Math.abs(e - best.e) < 1e-6 && Math.abs(dx) + Math.abs(dy) < Math.abs(best.dx) + Math.abs(best.dy))) best = { e, dx, dy, off };
+  }
+  // Ajuste fino por debajo del píxel (interpolando la foto anterior)
+  const bil = (x, y) => {
+    const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, i = yi * W + xi;
+    return (ga[i] * (1 - fx) + ga[i + 1] * fx) * (1 - fy) + (ga[i + W] * (1 - fx) + ga[i + W + 1] * fx) * fy;
+  };
+  for (const paso of [0.5, 0.25]){
+    const c0 = best;
+    for (const [ox, oy] of [[-paso, 0], [paso, 0], [0, -paso], [0, paso]]){
+      const dx = c0.dx + ox, dy = c0.dy + oy;
+      if (Math.abs(dx) > 3.5 || Math.abs(dy) > 3.5) continue;
+      let e = 0, n = 0, sa = 0, sb = 0;
+      for (let y = M; y < H - M; y += 3) for (let x = M; x < W - M; x += 3){ sa += bil(x + dx, y + dy); sb += gb[y * W + x]; n++; }
+      const off = (sb - sa) / n;
+      for (let y = M; y < H - M; y += 3) for (let x = M; x < W - M; x += 3) e += Math.abs(gb[y * W + x] - bil(x + dx, y + dy) - off);
+      e /= n;
+      if (e < best.e) best = { e, dx, dy, off };
+    }
+  }
+  const { dx: sx, dy: sy, off } = best;
+  // Diferencia con el brillo corregido
+  const df = new Float32Array(W * H);
+  for (let y = M; y < H - M; y++) for (let x = M; x < W - M; x++){
+    const i = y * W + x;
+    df[i] = Math.abs(gb[i] - bil(x + sx, y + sy) - off);
+  }
+  // Umbral según el ruido de la propia pareja de fotos
+  const hist = new Uint32Array(256); let tot = 0;
+  for (let i = 0; i < df.length; i++){ hist[Math.min(255, df[i] | 0)]++; tot++; }
+  let acc = 0, p90 = 0;
+  for (let v = 0; v < 256; v++){ acc += hist[v]; if (acc >= tot * 0.9){ p90 = v; break; } }
+  const T = Math.max(10, p90 * 2.5);
+  const w = new Float32Array(W * H);
+  for (let i = 0; i < w.length; i++) w[i] = df[i] > T ? df[i] - T * 0.5 : 0;
+  // Mejor posición de un disco del tamaño del perdigón (primero con una caja, luego con el disco exacto)
+  const r = hrP * k, half = Math.max(1, Math.round(r * 0.85));
+  const I = new Float64Array((W + 1) * (H + 1));
+  for (let y = 0; y < H; y++){ let row = 0; for (let x = 0; x < W; x++){ row += w[y * W + x]; I[(y + 1) * (W + 1) + x + 1] = I[y * (W + 1) + x + 1] + row; } }
+  const box = (cx, cy) => {
+    const ax = Math.max(0, cx - half), ay = Math.max(0, cy - half), bx = Math.min(W, cx + half + 1), by = Math.min(H, cy + half + 1);
+    return I[by * (W + 1) + bx] - I[ay * (W + 1) + bx] - I[by * (W + 1) + ax] + I[ay * (W + 1) + ax];
+  };
+  // Con la pista del lector solo se mira a su alrededor (unos 12 mm)
+  const px = pista ? (pista.x - x0) * k : 0, py = pista ? (pista.y - y0) * k : 0, rp = 12 * (r / PELLET);
+  const cerca = (x, y) => !pista || (x - px) * (x - px) + (y - py) * (y - py) <= rp * rp;
+  let bs = 0, bx = -1, by = -1;
+  for (let y = M; y < H - M; y++) for (let x = M; x < W - M; x++){ if (!cerca(x, y)) continue; const v = box(x, y); if (v > bs){ bs = v; bx = x; by = y; } }
+  if (bx < 0 || bs <= 0) return { ok:false, dx: -sx / k, dy: -sy / k, k };
+  const disc = (cx, cy) => {
+    let sum = 0, cnt = 0, on = 0;
+    const R = Math.ceil(r) + 1;
+    for (let y = Math.max(0, Math.floor(cy - R)); y <= Math.min(H - 1, Math.ceil(cy + R)); y++)
+      for (let x = Math.max(0, Math.floor(cx - R)); x <= Math.min(W - 1, Math.ceil(cx + R)); x++){
+        if ((x - cx) * (x - cx) + (y - cy) * (y - cy) > r * r) continue;
+        cnt++; const v = w[y * W + x]; sum += v; if (v > 0) on++;
+      }
+    return { sum, fill: cnt ? on / cnt : 0 };
+  };
+  let bd = { sum: -1 }, fx = bx, fy = by;
+  const span = Math.max(2, r * 0.6);
+  for (let yy = by - span; yy <= by + span; yy += 0.5) for (let xx = bx - span; xx <= bx + span; xx += 0.5){
+    const v = disc(xx, yy); if (v.sum > bd.sum){ bd = v; fx = xx; fy = yy; }
+  }
+  // Seguridad: otro máximo separado casi igual de fuerte deja el resultado en duda
+  let segundo = 0;
+  for (let y = M; y < H - M; y += 2) for (let x = M; x < W - M; x += 2){
+    if (Math.hypot(x - fx, y - fy) < r * 3 || !cerca(x, y)) continue;
+    const v = box(x, y); if (v > segundo) segundo = v;
+  }
+  const fill = bd.fill, claro = segundo < bs * 0.6;
+  const conf = Math.min(1, fill / 0.45) * (claro ? 1 : 0.5);
+  return {
+    ok: fill >= 0.15, cand: fill >= 0.06, conf, fill, k,
+    x: x0 + (fx + 0.5) / k, y: y0 + (fy + 0.5) / k, dx: -sx / k, dy: -sy / k
+  };
+}
+
+// Sin la parte Android (navegador de pruebas): se habla con el lector directamente
+async function lectorWeb(){
+  const tk = ++Lec.web; let seq = -1, fallos = 0;
+  const foto = async q => { const r = await fetch(LECTOR_URL + '/foto' + q, { cache:'no-store' }); if (!r.ok) throw 0;
+    const u = URL.createObjectURL(await r.blob()); return await new Promise((ok, ko) => { const im = new Image(); im.onload = () => ok(im); im.onerror = ko; im.src = u; }); };
+  while (Lec.on && tk === Lec.web){
+    try {
+      const e = await (await fetch(LECTOR_URL + '/estado', { cache:'no-store' })).json();
+      fallos = 0;
+      if (Lec.estado !== 'conectado'){ window.onLectorEstado({ estado:'conectado', info:e }); }
+      if (seq < 0){ const im = await foto(''); seq = e.seq; lectorEvento({ tipo:'conexion', ...e }, im); }
+      else if (e.seq !== seq){ const im = await foto('?seq=' + e.seq); seq = e.seq; lectorEvento({ ...e }, im); }
+    } catch (_) {
+      if (++fallos >= 3) window.onLectorEstado({ estado:'buscando', texto:'No encuentro el lector. Únete a la red WiFi LineaDeTiro-Lector.' });
+    }
+    await new Promise(r => setTimeout(r, 400));
+  }
+}
+
+function initLector(){
+  $('lecBtn').addEventListener('click', () => {
+    if (St.session && fuenteActual() !== 'lector') setFuente('lector');
+    lectorConectar();
+  });
+  $('lecOff').addEventListener('click', lectorDesconectar);
+  $('lecRef').addEventListener('click', lectorReleer);
+}
+
 function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 function prepCanvas(cv, hCss){
   const css = cv.clientWidth || 320, u = Math.min(2, window.devicePixelRatio || 1);
@@ -2532,6 +2833,7 @@ function renderSessions(){
   const fu = FUENTES.includes(SV.fuente) ? SV.fuente : Cfg.fuente;
   $('fFuenteCam').setAttribute('aria-pressed', fu === 'camara' ? 'true' : 'false');
   $('fFuenteGal').setAttribute('aria-pressed', fu === 'galeria' ? 'true' : 'false');
+  $('fFuenteLec').setAttribute('aria-pressed', fu === 'lector' ? 'true' : 'false');
   $('presets').hidden = SV.tipo !== 'competicion';
   $('fDianasHint').textContent = SV.tipo === 'competicion' ? 'Obligatorio en competición.' : 'Déjalo vacío para un entreno sin límite.';
 
@@ -2714,6 +3016,7 @@ function initSessions(){
   $('fTipoEnt').addEventListener('click', () => { SV.tipo = 'entreno'; renderSessions(); });
   $('fFuenteCam').addEventListener('click', () => { SV.fuente = 'camara'; renderSessions(); });
   $('fFuenteGal').addEventListener('click', () => { SV.fuente = 'galeria'; renderSessions(); });
+  $('fFuenteLec').addEventListener('click', () => { SV.fuente = 'lector'; renderSessions(); });
   $('presets').querySelectorAll('[data-d]').forEach(b => b.addEventListener('click', () => { $('fDianas').value = b.dataset.d; $('fPor').value = b.dataset.p; }));
   $('newForm').addEventListener('submit', e => { e.preventDefault(); startSession(); });
   $('backList').addEventListener('click', () => { SV.detailId = null; SV.openTarget = null; $('sesNotice').hidden = true; renderSessions(); try { window.scrollTo(0, 0); } catch (_) {} });
@@ -3204,7 +3507,7 @@ function loadCfg(){
     const sd = typeof o.sensDef === 'number' ? o.sensDef : o.sens;   // versiones anteriores guardaban «sens»
     if (typeof sd === 'number') Cfg.sensDef = Math.max(0, Math.min(100, Math.round(sd)));
     if (['sistema', 'claro', 'oscuro'].includes(o.tema)) Cfg.tema = o.tema;
-    if (['camara', 'galeria'].includes(o.fuente)) Cfg.fuente = o.fuente;
+    if (['camara', 'galeria', 'lector'].includes(o.fuente)) Cfg.fuente = o.fuente;
   } catch (_) {}
 }
 function applyTheme(){
@@ -3304,6 +3607,7 @@ function init(){
   initStats();
   initSettings();
   initCamera();
+  initLector();
   if (window.matchMedia){
     try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (Cfg.tema === 'sistema') redrawCurrent(); }); } catch (_) {}
   }

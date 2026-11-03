@@ -19,13 +19,17 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 - Estadísticas del histórico: media, diámetro medio de agrupación, radio medio, deriva (nivel, dirección y constancia), dispersión horizontal y vertical, reparto por anillos, rendimiento a lo largo de la sesión y mejores marcas.
 - Navegación con barra inferior (columna lateral en pantallas anchas) y pantalla de Ajustes: disciplina y sensibilidad por defecto, tema claro u oscuro, copia de seguridad (exportar y restaurar) y actualizaciones.
 - Funciona sin conexión.
+- **Lector WiFi (opcional)**: una cámara ESP32 junto a la diana marca cada impacto al momento y en orden, sin hacer fotos. Montaje y firmware en [`lector/`](lector/README.md).
 
 ## Estructura
 
 - `app/src/main/assets/index.html`: toda la lógica de detección y la interfaz.
 - `app/src/main/java/es/pablo/puntuador/MainActivity.java`: la ventana Android que muestra la página y abre la cámara o la galería.
 - `.github/workflows/compilar-apk.yml`: compila y publica el APK.
+- `app/src/main/java/es/pablo/puntuador/Lector.java`: conexión con el lector WiFi (se une a su red y descarga cada aviso con su foto).
+- `lector/lector.ino`: firmware del lector (ESP32 con cámara). `.github/workflows/compilar-lector.yml` lo compila y publica en la versión «lector».
 - `herramientas/banco-deteccion.js`: banco de pruebas con dianas sintéticas para medir la detección antes y después de cada cambio.
+- `herramientas/banco-lector.js`: banco de pruebas del lector: impactos uno a uno sobre fotos simuladas de la cámara.
 
 ## Actualizaciones
 

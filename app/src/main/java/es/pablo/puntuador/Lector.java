@@ -1,0 +1,299 @@
+package es.pablo.puntuador;
+
+import android.annotation.TargetApi;
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
+import android.net.wifi.WifiNetworkSpecifier;
+import android.os.Build;
+import android.util.Base64;
+
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+/**
+ * Conexión con el lector de impactos (ESP32 con cámara junto a la diana).
+ * El lector crea su propia red WiFi sin internet. La app se une a ella solo para hablar con el lector
+ * (el resto del móvil sigue usando sus datos), pregunta cada poco por /estado y, cuando hay un aviso
+ * nuevo, descarga su foto y se la pasa a la página.
+ */
+final class Lector {
+
+    interface Oyente {
+        void estado(JSONObject o);
+        void evento(JSONObject o);
+    }
+
+    static final String RED = "LineaDeTiro-Lector";
+    static final String CLAVE = "lineadetiro";
+    static final String BASE = "http://192.168.4.1";
+
+    private final ConnectivityManager cm;
+    private final Oyente oyente;
+
+    private volatile boolean activo = false;
+    private volatile Network red = null;
+    private volatile boolean pedida = false;
+    private volatile boolean rechazada = false;
+    private ConnectivityManager.NetworkCallback cb = null;
+    private Thread hilo = null;
+    private long seqVisto = -1;
+
+    Lector(Context ctx, Oyente oyente) {
+        this.cm = (ConnectivityManager) ctx.getSystemService(Context.CONNECTIVITY_SERVICE);
+        this.oyente = oyente;
+    }
+
+    boolean activo() {
+        return activo;
+    }
+
+    synchronized void conectar() {
+        rechazada = false;
+        if (activo) {
+            if (red == null && !pedida) pedirRed();
+            return;
+        }
+        activo = true;
+        seqVisto = -1;
+        hilo = new Thread(this::bucle, "lector");
+        hilo.start();
+    }
+
+    synchronized void desconectar() {
+        activo = false;
+        if (hilo != null) hilo.interrupt();
+        hilo = null;
+        soltarRed();
+        red = null;
+        avisar("desconectado", "Lector desconectado.", null);
+    }
+
+    /** La imagen actual pasa a ser la diana nueva. */
+    void referencia() {
+        enSegundoPlano(() -> pedirTexto("/referencia"));
+    }
+
+    void ajustes(final String consulta) {
+        enSegundoPlano(() -> {
+            String r = pedirTexto("/ajustes?" + consulta);
+            if (r != null) {
+                try {
+                    avisar("conectado", null, new JSONObject(r));
+                } catch (Exception ignored) {
+                }
+            }
+        });
+    }
+
+    /* ---------------- Bucle de vigilancia ---------------- */
+
+    private void bucle() {
+        int fallos = 0;
+        long ultimoIntento = 0;
+        avisar("buscando", "Buscando el lector…", null);
+        while (activo) {
+            try {
+                if (red == null) {
+                    Network n = buscarRedConLector();
+                    if (n != null) {
+                        red = n;
+                    } else {
+                        long ahora = System.currentTimeMillis();
+                        if (!pedida && !rechazada && ahora - ultimoIntento > 15000) {
+                            ultimoIntento = ahora;
+                            pedirRed();
+                        }
+                        avisar("buscando", rechazada
+                                ? "No me he podido unir a la red " + RED + ". Enciende el lector y pulsa «Conectar» otra vez, o únete a esa red desde los ajustes de WiFi."
+                                : "Buscando el lector… Si Android pregunta, acepta unirte a la red " + RED + ".", null);
+                        dormir(1500);
+                        continue;
+                    }
+                }
+
+                String txt = pedirTexto("/estado");
+                if (txt == null) {
+                    if (++fallos >= 4) {
+                        avisar("buscando", "He perdido el lector. Comprueba que está encendido y cerca.", null);
+                        if (fallos >= 8) red = null;
+                    }
+                    dormir(700);
+                    continue;
+                }
+                fallos = 0;
+                JSONObject e = new JSONObject(txt);
+                long seq = e.optLong("seq", 0);
+                if (seqVisto < 0) {
+                    // Primera vez: la foto actual sirve de punto de partida
+                    avisar("conectado", null, e);
+                    byte[] foto = pedirBytes("/foto");
+                    if (foto != null) {
+                        seqVisto = seq;
+                        enviarEvento("conexion", e, foto);
+                    }
+                } else if (seq != seqVisto) {
+                    byte[] foto = pedirBytes("/foto?seq=" + seq);
+                    if (foto != null) {
+                        seqVisto = seq;
+                        enviarEvento(e.optString("tipo", "impacto"), e, foto);
+                    }
+                }
+                dormir(350);
+            } catch (Exception ex) {
+                dormir(800);
+            }
+        }
+    }
+
+    private void enviarEvento(String tipo, JSONObject e, byte[] foto) {
+        try {
+            JSONObject o = new JSONObject();
+            o.put("tipo", tipo);
+            o.put("seq", e.optLong("seq", 0));
+            o.put("x", e.optDouble("x", 0));
+            o.put("y", e.optDouble("y", 0));
+            o.put("pix", e.optInt("pix", 0));
+            o.put("manual", e.optBoolean("manual", false));
+            o.put("lector", e);
+            o.put("foto", "data:image/jpeg;base64," + Base64.encodeToString(foto, Base64.NO_WRAP));
+            oyente.evento(o);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void avisar(String estado, String texto, JSONObject info) {
+        try {
+            JSONObject o = new JSONObject();
+            o.put("estado", estado);
+            if (texto != null) o.put("texto", texto);
+            if (info != null) o.put("info", info);
+            oyente.estado(o);
+        } catch (Exception ignored) {
+        }
+    }
+
+    /* ---------------- Red WiFi del lector ---------------- */
+
+    /** Busca entre las redes WiFi activas una desde la que responda el lector (también si el usuario se unió a mano). */
+    private Network buscarRedConLector() {
+        try {
+            for (Network n : cm.getAllNetworks()) {
+                NetworkCapabilities c = cm.getNetworkCapabilities(n);
+                if (c == null || !c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) continue;
+                if (pedirTexto(n, "/estado", 1500) != null) return n;
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    @TargetApi(29)
+    private synchronized void pedirRed() {
+        if (Build.VERSION.SDK_INT < 29 || pedida) return;
+        try {
+            WifiNetworkSpecifier esp = new WifiNetworkSpecifier.Builder()
+                    .setSsid(RED)
+                    .setWpa2Passphrase(CLAVE)
+                    .build();
+            NetworkRequest req = new NetworkRequest.Builder()
+                    .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                    .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    .setNetworkSpecifier(esp)
+                    .build();
+            cb = new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(Network n) {
+                    red = n;
+                }
+
+                @Override
+                public void onLost(Network n) {
+                    if (n.equals(red)) red = null;
+                }
+
+                @Override
+                public void onUnavailable() {
+                    pedida = false;
+                    rechazada = true;
+                    cb = null;
+                }
+            };
+            pedida = true;
+            cm.requestNetwork(req, cb);
+        } catch (Exception ex) {
+            pedida = false;
+            rechazada = true;
+        }
+    }
+
+    private synchronized void soltarRed() {
+        if (cb != null) {
+            try {
+                cm.unregisterNetworkCallback(cb);
+            } catch (Exception ignored) {
+            }
+        }
+        cb = null;
+        pedida = false;
+    }
+
+    /* ---------------- Peticiones HTTP por la red del lector ---------------- */
+
+    private String pedirTexto(String ruta) {
+        Network n = red;
+        if (n == null) return null;
+        return pedirTexto(n, ruta, 2500);
+    }
+
+    private static String pedirTexto(Network n, String ruta, int espera) {
+        byte[] b = pedir(n, ruta, espera, 4000);
+        return b == null ? null : new String(b, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private byte[] pedirBytes(String ruta) {
+        Network n = red;
+        if (n == null) return null;
+        return pedir(n, ruta, 3000, 10000);
+    }
+
+    private static byte[] pedir(Network n, String ruta, int espera, int lectura) {
+        HttpURLConnection c = null;
+        try {
+            c = (HttpURLConnection) n.openConnection(new URL(BASE + ruta));
+            c.setConnectTimeout(espera);
+            c.setReadTimeout(lectura);
+            c.setUseCaches(false);
+            if (c.getResponseCode() != 200) return null;
+            try (InputStream in = c.getInputStream()) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream(64 * 1024);
+                byte[] buf = new byte[16384];
+                int k;
+                while ((k = in.read(buf)) > 0) out.write(buf, 0, k);
+                return out.toByteArray();
+            }
+        } catch (Exception e) {
+            return null;
+        } finally {
+            if (c != null) c.disconnect();
+        }
+    }
+
+    private void enSegundoPlano(Runnable r) {
+        new Thread(r, "lector-orden").start();
+    }
+
+    private static void dormir(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}

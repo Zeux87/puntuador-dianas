@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'lector/**'
+      - '.github/workflows/compilar-lector.yml'
   workflow_dispatch:
 
 permissions:
