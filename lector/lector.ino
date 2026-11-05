@@ -28,7 +28,7 @@
 #include "esp_wifi.h"
 #include "img_converters.h"
 
-#define VERSION_LECTOR "1.0"
+#define VERSION_LECTOR "1.1"
 
 // ===================== Red =====================
 static const char *RED_NOMBRE = "LineaDeTiro-Lector";
@@ -325,23 +325,44 @@ static esp_err_t hAjustes(httpd_req_t *r) {
 static const char PAGINA[] PROGMEM = R"HTML(<!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Lector de impactos</title>
 <style>body{font-family:system-ui,sans-serif;margin:0;background:#0e1213;color:#e8ebe6}main{padding:12px;max-width:900px;margin:auto}
-img{width:100%;border-radius:8px;background:#222}button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid #16cde1;background:#162022;color:#e8ebe6;margin:4px 4px 4px 0}
-p{margin:6px 0}small{opacity:.7}</style></head><body><main>
+#vista{position:relative;border-radius:8px;overflow:auto;background:#222;max-height:70vh}#f{display:block;width:100%}
+#vista.lupa #f{width:auto;max-width:none}
+button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid #16cde1;background:#162022;color:#e8ebe6;margin:4px 4px 4px 0}
+button.on{background:#16cde1;color:#0e1213}p{margin:6px 0}small{opacity:.7}
+#enf{border:1px solid #2b3a3c;border-radius:8px;padding:8px 10px;margin:8px 0}#barra{height:14px;background:#222;border-radius:7px;overflow:hidden}
+#barra i{display:block;height:100%;width:0;background:#16cde1;transition:width .2s}#barra i.max{background:#35c76a}
+#n{font-size:1.6em;font-weight:700}</style></head><body><main>
 <h2>Lector de impactos</h2>
 <p id="e">Conectando…</p>
-<img id="f" alt="Vista de la cámara">
-<p><button onclick="go('/referencia')">Diana nueva (referencia)</button>
+<div id="vista"><img id="f" alt="Vista de la cámara"></div>
+<div id="enf"><p>Nitidez del centro: <span id="n">–</span> <small>(mejor: <span id="mx">–</span> · <span id="fps">–</span> fotos/s en esta vista)</small></p>
+<div id="barra"><i id="bi"></i></div>
+<p><small>Para enfocar: diana en su sitio y bien iluminada, gira la lente muy poco (1/16 de vuelta), espera 2 fotos y quédate donde el número sea más alto. Si baja, gira hacia el otro lado.</small></p></div>
+<p><button id="bl" onclick="lupa()">Lupa 1:1</button><button onclick="mx=0">Reiniciar mejor</button>
+<button onclick="go('/referencia')">Diana nueva (referencia)</button>
 <button onclick="go('/ajustes?giro='+(1-(S.giro||0)))">Girar 180°</button>
 <button id="luz" onclick="go('/ajustes?luz='+(1-(S.luz||0)))" hidden>Luz</button></p>
 <p>Sensibilidad <input id="s" type="range" min="0" max="100" onchange="go('/ajustes?sens='+this.value)"> <b id="so"></b></p>
-<p><small>Encuadra la diana entera, que se lean los números y no salga en espejo. La app hace el resto.</small></p>
+<p><small>Esto no es vídeo: la vista trae fotos completas una tras otra. El lector vigila por su cuenta unas 5 veces por segundo y avisa a la app en menos de un segundo tras cada impacto.</small></p>
 </main><script>
-let S={};const $=i=>document.getElementById(i);
+let S={},mx=0,t0=Date.now(),nf=0,cv=document.createElement('canvas');const $=i=>document.getElementById(i);
 function go(u){fetch(u).then(r=>r.json()).then(j=>{S=j;pinta()}).catch(()=>{})}
 function pinta(){$('e').textContent=`${S.placa} · ${S.sensor} ${S.ancho}×${S.alto} · aviso ${S.seq} (${S.tipo}) · sensibilidad ${S.sens}`;
 $('s').value=S.sens;$('so').textContent=S.sens;$('luz').hidden=!S.hayLuz}
-function foto(){const i=new Image();i.onload=()=>{$('f').src=i.src;setTimeout(foto,600)};i.onerror=()=>setTimeout(foto,1500);i.src='/foto?t='+Date.now()}
-setInterval(()=>go('/estado'),1500);go('/estado');foto();
+function lupa(){const v=$('vista');v.classList.toggle('lupa');$('bl').classList.toggle('on');centra()}
+function centra(){const v=$('vista'),f=$('f');if(v.classList.contains('lupa')){v.scrollLeft=(f.naturalWidth-v.clientWidth)/2;v.scrollTop=(f.naturalHeight-v.clientHeight)/2}}
+function nitidez(im){const w=Math.min(400,im.naturalWidth),h=Math.min(400,im.naturalHeight);cv.width=w;cv.height=h;
+const x=cv.getContext('2d',{willReadFrequently:true});x.drawImage(im,(im.naturalWidth-w)/2,(im.naturalHeight-h)/2,w,h,0,0,w,h);
+const d=x.getImageData(0,0,w,h).data,g=new Float32Array(w*h);for(let i=0,j=0;i<g.length;i++,j+=4)g[i]=(d[j]+2*d[j+1]+d[j+2])/4;
+let s=0,n=0;for(let y=1;y<h-1;y++)for(let x2=1;x2<w-1;x2++){const i=y*w+x2;
+const gx=g[i-w+1]+2*g[i+1]+g[i+w+1]-g[i-w-1]-2*g[i-1]-g[i+w-1],gy=g[i+w-1]+2*g[i+w]+g[i+w+1]-g[i-w-1]-2*g[i-w]-g[i-w+1];
+const m=gx*gx+gy*gy;if(m>400){s+=m;n++}}return n?Math.round(Math.sqrt(s/(w*h))):0}
+function foto(){const i=new Image();i.onload=()=>{const pr=!$('f').naturalWidth;$('f').src=i.src;if(pr)setTimeout(centra,50);
+const v=nitidez(i);mx=Math.max(mx,v);$('n').textContent=v;$('mx').textContent=mx;
+const b=$('bi');b.style.width=(mx?100*v/mx:0)+'%';b.classList.toggle('max',v>=mx*0.97);
+nf++;const dt=(Date.now()-t0)/1000;if(dt>3){$('fps').textContent=(nf/dt).toFixed(1);nf=0;t0=Date.now()}
+setTimeout(foto,50)};i.onerror=()=>setTimeout(foto,1500);i.src='/foto?t='+Date.now()}
+setInterval(()=>go('/estado'),2000);go('/estado');foto();
 </script></body></html>)HTML";
 
 static esp_err_t hInicio(httpd_req_t *r) {

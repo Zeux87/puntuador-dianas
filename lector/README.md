@@ -38,6 +38,8 @@ También se puede compilar `lector.ino` con Arduino IDE (núcleo ESP32 de Espres
 
 Para apuntar la cámara, únete con el móvil a la red **LineaDeTiro-Lector** (clave `lineadetiro`) y abre <http://192.168.4.1> en el navegador: verás la imagen en directo, un botón para **girarla 180°** si la cámara está boca abajo y la **sensibilidad**. Comprueba que los números de la diana se leen bien y no salen en espejo.
 
+**Enfocar**: la lente viene enfocada para lejos y a 30 cm hay que ajustarla. Con la diana en su sitio y bien iluminada, mira el número **«Nitidez del centro»** de esa página y la vista **Lupa 1:1**. Gira la lente muy poco cada vez (1/16 de vuelta), espera un par de fotos y quédate donde el número sea más alto. Si baja, gira hacia el otro lado. Quita antes el plástico protector de la lente si lo trae.
+
 ## Uso con la app
 
 1. Enciende el lector y espera a que se apague su luz (unos segundos). Si se queda parpadeando, no encuentra la cámara o le falta la PSRAM.
