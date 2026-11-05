@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- El lector de impactos habla HTTP sin cifrar en su propia red WiFi; el resto sigue siendo solo HTTPS -->
+<!-- El lector de impactos (ESP32 o la app Lector en otro móvil) habla HTTP sin cifrar dentro de su propia red WiFi,
+     y su dirección no es fija (la puerta de enlace de la zona WiFi del móvil). Las conexiones a internet siguen siendo HTTPS. -->
 <network-security-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">192.168.4.1</domain>
-    </domain-config>
+    <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

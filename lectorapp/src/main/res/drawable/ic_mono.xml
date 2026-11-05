@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Versión de un solo color para los iconos temáticos de Android 13 o superior -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M37.491,47.0 L44.755,47.0 L44.755,74.956 L63.245,74.956 L63.245,47.0 L70.509,47.0 L70.509,82.0 L37.491,82.0 Z" android:fillColor="#FFFFFFFF" />
+    <path android:pathData="M50.258,47.0 L57.522,47.0 L57.522,67.912 L59.943,67.912 L59.943,73.195 L48.057,73.195 L48.057,67.912 L50.258,67.912 Z" android:fillColor="#FFFFFFFF" />
+    <path android:pathData="M43.8,35.6 a10.2,10.2 0 1,0 20.4,0 a10.2,10.2 0 1,0 -20.4,0 Z" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.6" />
+    <path android:pathData="M48.084,35.6 a5.916,5.916 0 1,0 11.832,0 a5.916,5.916 0 1,0 -11.832,0 Z" android:strokeColor="#FFFFFFFF" android:strokeWidth="0.9" />
+    <path android:pathData="M50.474,35.272 a1.558,1.558 0 1,0 3.116,0 a1.558,1.558 0 1,0 -3.116,0 Z M54.82,32.812 a1.64,1.64 0 1,0 3.28,0 a1.64,1.64 0 1,0 -3.28,0 Z M49.941,38.224 a1.435,1.435 0 1,0 2.87,0 a1.435,1.435 0 1,0 -2.87,0 Z M53.344,37.978 a1.64,1.64 0 1,0 3.28,0 a1.64,1.64 0 1,0 -3.28,0 Z" android:fillColor="#FFFFFFFF" />
+</vector>

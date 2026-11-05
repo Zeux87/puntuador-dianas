@@ -3,9 +3,11 @@ package es.pablo.puntuador;
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.net.ConnectivityManager;
+import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.net.RouteInfo;
 import android.net.wifi.WifiNetworkSpecifier;
 import android.os.Build;
 import android.util.Base64;
@@ -15,10 +17,15 @@ import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Conexión con el lector de impactos (ESP32 con cámara junto a la diana).
+ * Conexión con el lector de impactos: el ESP32 con cámara (en 192.168.4.1) o la app «Lector de dianas»
+ * en un móvil viejo con su zona WiFi activada (en la puerta de enlace de esa red, puerto 8080).
  * El lector crea su propia red WiFi sin internet. La app se une a ella solo para hablar con el lector
  * (el resto del móvil sigue usando sus datos), pregunta cada poco por /estado y, cuando hay un aviso
  * nuevo, descarga su foto y se la pasa a la página.
@@ -39,6 +46,7 @@ final class Lector {
 
     private volatile boolean activo = false;
     private volatile Network red = null;
+    private volatile String base = null;
     private volatile boolean pedida = false;
     private volatile boolean rechazada = false;
     private ConnectivityManager.NetworkCallback cb = null;
@@ -72,6 +80,7 @@ final class Lector {
         hilo = null;
         soltarRed();
         red = null;
+        base = null;
         avisar("desconectado", "Lector desconectado.", null);
     }
 
@@ -100,6 +109,14 @@ final class Lector {
         avisar("buscando", "Buscando el lector…", null);
         while (activo) {
             try {
+                if (red != null && base == null) {
+                    base = buscarBase(red);
+                    if (base == null) {
+                        avisar("buscando", "Conectado a la red " + RED + ", pero no encuentro el lector en ella. ¿Está abierta la app Lector o encendido el ESP32?", null);
+                        dormir(1500);
+                        continue;
+                    }
+                }
                 if (red == null) {
                     Network n = buscarRedConLector();
                     if (n != null) {
@@ -122,7 +139,10 @@ final class Lector {
                 if (txt == null) {
                     if (++fallos >= 4) {
                         avisar("buscando", "He perdido el lector. Comprueba que está encendido y cerca.", null);
-                        if (fallos >= 8) red = null;
+                        if (fallos >= 8) {
+                            red = null;
+                            base = null;
+                        }
                     }
                     dormir(700);
                     continue;
@@ -187,11 +207,45 @@ final class Lector {
             for (Network n : cm.getAllNetworks()) {
                 NetworkCapabilities c = cm.getNetworkCapabilities(n);
                 if (c == null || !c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) continue;
-                if (pedirTexto(n, "/estado", 1500) != null) return n;
+                String b = buscarBase(n);
+                if (b != null) {
+                    base = b;
+                    return n;
+                }
             }
         } catch (Exception ignored) {
         }
         return null;
+    }
+
+    /** Dirección del lector dentro de una red: el ESP32 está en 192.168.4.1; el móvil con zona WiFi es la puerta de enlace. */
+    private String buscarBase(Network n) {
+        for (String b : candidatos(n)) {
+            if (pedirTexto(n, b + "/estado", 1500) != null) return b;
+        }
+        return null;
+    }
+
+    private List<String> candidatos(Network n) {
+        List<String> r = new ArrayList<>();
+        r.add(BASE);
+        try {
+            LinkProperties lp = cm.getLinkProperties(n);
+            if (lp != null) {
+                for (RouteInfo ri : lp.getRoutes()) {
+                    InetAddress g = ri.getGateway();
+                    if (g instanceof Inet4Address && !g.isAnyLocalAddress()) {
+                        String ip = g.getHostAddress();
+                        if (!r.contains("http://" + ip + ":8080")) {
+                            r.add("http://" + ip + ":8080");
+                            r.add("http://" + ip);
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return r;
     }
 
     @TargetApi(29)
@@ -248,25 +302,27 @@ final class Lector {
 
     private String pedirTexto(String ruta) {
         Network n = red;
-        if (n == null) return null;
-        return pedirTexto(n, ruta, 2500);
+        String b = base;
+        if (n == null || b == null) return null;
+        return pedirTexto(n, b + ruta, 2500);
     }
 
-    private static String pedirTexto(Network n, String ruta, int espera) {
-        byte[] b = pedir(n, ruta, espera, 4000);
+    private static String pedirTexto(Network n, String url, int espera) {
+        byte[] b = pedir(n, url, espera, 4000);
         return b == null ? null : new String(b, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     private byte[] pedirBytes(String ruta) {
         Network n = red;
-        if (n == null) return null;
-        return pedir(n, ruta, 3000, 10000);
+        String b = base;
+        if (n == null || b == null) return null;
+        return pedir(n, b + ruta, 3000, 15000);
     }
 
-    private static byte[] pedir(Network n, String ruta, int espera, int lectura) {
+    private static byte[] pedir(Network n, String url, int espera, int lectura) {
         HttpURLConnection c = null;
         try {
-            c = (HttpURLConnection) n.openConnection(new URL(BASE + ruta));
+            c = (HttpURLConnection) n.openConnection(new URL(url));
             c.setConnectTimeout(espera);
             c.setReadTimeout(lectura);
             c.setUseCaches(false);

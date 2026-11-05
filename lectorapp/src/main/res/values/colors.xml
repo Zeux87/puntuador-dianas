@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fondo oscuro para distinguirla del Puntuador -->
+    <color name="icono_fondo">#16292C</color>
+    <color name="fondo_oscuro">#0E1213</color>
+</resources>

@@ -6,7 +6,9 @@ on:
       - main
     paths-ignore:
       - 'lector/**'
+      - 'lectorapp/**'
       - '.github/workflows/compilar-lector.yml'
+      - '.github/workflows/compilar-lector-app.yml'
   workflow_dispatch:
 
 permissions:
@@ -35,7 +37,7 @@ jobs:
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           set -o pipefail
-          gradle assembleRelease --no-daemon --stacktrace 2>&1 | tee compilacion.log
+          gradle :app:assembleRelease --no-daemon --stacktrace 2>&1 | tee compilacion.log
 
       - name: Mostrar errores de compilación
         if: failure()
