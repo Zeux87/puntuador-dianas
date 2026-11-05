@@ -1,0 +1,68 @@
+name: Compilar app Lector
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lectorapp/**'
+      - '.github/workflows/compilar-lector-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  compilar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Instalar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Compilar el APK
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          set -o pipefail
+          gradle :lectorapp:assembleRelease ${{ github.ref != 'refs/heads/main' && ':app:assembleRelease' || '' }} --no-daemon --stacktrace 2>&1 | tee compilacion.log
+
+      - name: Mostrar errores de compilación
+        if: failure()
+        run: |
+          grep -E "error:|e: |Duplicate class|FAILURE|What went wrong" -A 3 compilacion.log | head -n 60 | while IFS= read -r l; do
+            echo "::error::${l//%/%25}"
+          done
+
+      - name: Renombrar el APK
+        run: cp lectorapp/build/outputs/apk/release/lectorapp-release.apk LectorDianas.apk
+
+      - name: Guardar el APK en la ejecución
+        uses: actions/upload-artifact@v4
+        with:
+          name: LectorDianas-1.0.${{ github.run_number }}
+          path: LectorDianas.apk
+
+      # Va en la versión «lector» (pre-release) para que el Puntuador no la tome por una actualización suya
+      - name: Publicar en la versión «lector»
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTAS="Lector de impactos para el Puntuador. Opción 1, ESP32: graba el firmware en la dirección 0x0 con https://espressif.github.io/esptool-js/ desde Chrome en el ordenador (Lector-XIAO-ESP32S3.bin para la Seeed XIAO ESP32S3 Sense, Lector-ESP32-CAM.bin para la ESP32-CAM AI-Thinker). Opción 2, móvil viejo: instala LectorDianas.apk en él, activa su zona WiFi con el nombre LineaDeTiro-Lector y la clave lineadetiro, y abre la app. Guía completa en lector/README.md del repositorio. App Lector 1.0.${{ github.run_number }}."
+          if gh release view lector >/dev/null 2>&1; then
+            gh release upload lector LectorDianas.apk --clobber
+            gh release edit lector --notes "$NOTAS" --title "Lector de impactos (ESP32 y app para móvil viejo)" --prerelease
+          else
+            gh release create lector LectorDianas.apk --title "Lector de impactos (ESP32 y app para móvil viejo)" --notes "$NOTAS" --prerelease --latest=false
+          fi

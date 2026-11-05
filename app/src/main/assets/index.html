@@ -2568,7 +2568,9 @@ function lectorEvento(o, im){
   const enPantalla = St.lector && St.P;
   if (o.tipo === 'impacto' && enPantalla && St.cal){ lectorImpacto(o, im); return; }
   if (o.tipo === 'impacto' && enPantalla){ lectorCargar(im); return; }
-  if (o.tipo === 'conexion' && enPantalla && St.cal){ lectorRebase(im); return; }
+  // «conexion» al reconectar y «ajuste» cuando el lector vuelve a enfocar: misma diana, solo cambia la foto de base
+  if ((o.tipo === 'conexion' || o.tipo === 'ajuste') && enPantalla && St.cal){ lectorRebase(im); return; }
+  if (o.tipo === 'ajuste' && enPantalla) return;
   // Diana nueva. Si la actual tiene impactos sin guardar en una sesión, la nueva espera a que se guarde
   if (enPantalla && St.session && St.shots.length && !o.manual){
     Lec.pend = im;

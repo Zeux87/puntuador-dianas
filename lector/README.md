@@ -4,6 +4,11 @@ Una cámara ESP32 junto a la diana que marca cada impacto en la app al momento y
 
 El lector vigila la diana. Cuando aparece un agujero nuevo y la imagen se queda quieta (menos de un segundo), guarda esa foto y avisa. La app la descarga, la compara con la anterior para encontrar el agujero nuevo y lo añade al final de la lista. Como sabe qué agujero es nuevo, separa también los impactos pegados o solapados.
 
+Hay dos formas de montarlo, y la app de puntuar funciona igual con las dos:
+
+- **Opción 1: ESP32 con cámara** (pequeño y barato). Sigue desde «Material».
+- **Opción 2: un móvil viejo** con la app **Lector de dianas** (la mejor imagen, con autoenfoque). Ver «Opción 2» más abajo.
+
 ## Material
 
 | Pieza | Notas |
@@ -50,6 +55,24 @@ Para apuntar la cámara, únete con el móvil a la red **LineaDeTiro-Lector** (c
 
 **Releer diana** vuelve a leer la diana actual desde cero (útil si se ha movido el portablancos). **Desconectar** suelta la red del lector.
 
+## Opción 2: móvil viejo con la app Lector de dianas
+
+Cualquier Android 7 o superior con cámara trasera. Ese móvil vigila la diana y tu móvil puntúa, como con el ESP32.
+
+1. **Instala la app** en el móvil viejo: descarga `LectorDianas.apk` de la versión **«lector»** en [Releases](https://github.com/Zeux87/puntuador-dianas/releases/tag/lector) desde ese móvil e instálala (permite instalar apps de ese origen si lo pide).
+2. **Activa su zona WiFi** (Ajustes → Zona WiFi / Punto de acceso): nombre **LineaDeTiro-Lector**, clave **lineadetiro**, seguridad **WPA2**. No necesita SIM ni datos en la mayoría de móviles; si el tuyo no deja activarla sin SIM, dímelo. La app tiene un botón que abre esos ajustes.
+3. **Abre la app Lector** y dale permiso de cámara. Se ve la imagen en horizontal con un panel a la derecha.
+4. **Encuadra** con el móvil en horizontal, a 30–60 cm de la diana (con el zoom puedes ponerlo más lejos, que es más seguro). Que la diana ocupe la mitad de la imagen o más.
+5. **Enfoca** tocando la diana en la pantalla: enfoca ahí y deja fijos el enfoque, la exposición y el color, para que nada cambie entre disparo y disparo. Si cambias el zoom, vuelve a enfocar sola.
+6. En el Puntuador, crea una sesión **«Con el lector WiFi»** y acepta unirte a **LineaDeTiro-Lector**. En el panel del Lector verás «Puntuador conectado».
+
+Consejos:
+
+- Déjalo enchufado a un powerbank: la cámara y la pantalla gastan. **Pantalla oscura** baja el brillo al mínimo (la cámara sigue trabajando); toca la pantalla para volver.
+- La app no debe quedar en segundo plano ni con la pantalla apagada: Android corta la cámara.
+- **Encender luz** usa el flash del móvil como foco fijo si la diana está en penumbra.
+- Protégelo igual que el ESP32: fuera de la línea de tiro y con una chapa delante, asomando solo la cámara.
+
 ## Límites
 
 - Un perdigón que pasa exactamente por un agujero ya hecho no cambia la imagen: añádelo a mano con «Añadir».
@@ -60,5 +83,6 @@ Para apuntar la cámara, únete con el móvil a la red **LineaDeTiro-Lector** (c
 
 - El firmware (`lector.ino`) toma unas 5 fotos por segundo a máxima resolución. Cada una se decodifica a 1/8 en gris y se compara con una referencia (corrigiendo el brillo global). Si cambian pocos píxeles y la imagen se queda quieta 2 fotos seguidas, es un **impacto**; si cambian muchos, es una **diana nueva** («cambio»).
 - Rutas: `/estado` (JSON con el último aviso), `/foto?seq=N` (foto exacta del aviso), `/referencia`, `/ajustes?sens=&giro=&luz=`.
-- La app (`MainActivity.java` y `Lector.java`) se une a la red con `WifiNetworkSpecifier`, pregunta por `/estado` cada 350 ms y pasa cada foto nueva a la página. En `index.html`, `lectorLocaliza()` alinea las dos fotos (también por debajo del píxel), resta, y busca el disco del tamaño del perdigón que mejor explica la diferencia, cerca de la posición aproximada que manda el lector.
+- La app Lector (`lectorapp/`) hace lo mismo con CameraX: vigila a ~6 imágenes por segundo con la misma lógica (`Vigilante.java`), hace la foto a 5 MP con enfoque y exposición fijos y la sirve con las mismas rutas en el puerto 8080 (`Servidor.java`).
+- La app (`MainActivity.java` y `Lector.java`) se une a la red con `WifiNetworkSpecifier`, busca el lector en 192.168.4.1 (ESP32) o en la puerta de enlace de la red, puerto 8080 (móvil con zona WiFi), pregunta por `/estado` cada 350 ms y pasa cada foto nueva a la página. En `index.html`, `lectorLocaliza()` alinea las dos fotos (también por debajo del píxel), resta, y busca el disco del tamaño del perdigón que mejor explica la diferencia, cerca de la posición aproximada que manda el lector.
 - `herramientas/banco-lector.js` simula la cámara y dispara 80 impactos (con dobles, ruido, JPEG y papel que se mueve) para medir la precisión: con fondo gris, error medio de 0,23 mm.

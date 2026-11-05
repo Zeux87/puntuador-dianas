@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icono para Android 7: fondo y diana superpuestos -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/ic_fondo" />
+    <item android:drawable="@drawable/ic_diana" />
+</layer-list>

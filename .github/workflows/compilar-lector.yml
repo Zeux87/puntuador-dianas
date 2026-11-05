@@ -70,10 +70,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          NOTAS="Firmware del lector de impactos. Grábalo en la dirección 0x0 (archivo completo) con https://espressif.github.io/esptool-js/ desde Chrome en el ordenador. Lector-XIAO-ESP32S3.bin para la Seeed XIAO ESP32S3 Sense; Lector-ESP32-CAM.bin para la ESP32-CAM AI-Thinker. Compilación ${{ github.run_number }}."
+          NOTAS="Lector de impactos para el Puntuador. Opción 1, ESP32: graba el firmware en la dirección 0x0 con https://espressif.github.io/esptool-js/ desde Chrome en el ordenador (Lector-XIAO-ESP32S3.bin para la Seeed XIAO ESP32S3 Sense, Lector-ESP32-CAM.bin para la ESP32-CAM AI-Thinker). Opción 2, móvil viejo: instala LectorDianas.apk en él, activa su zona WiFi con el nombre LineaDeTiro-Lector y la clave lineadetiro, y abre la app. Guía completa en lector/README.md del repositorio. Compilación del firmware ${{ github.run_number }}."
           if gh release view lector >/dev/null 2>&1; then
             gh release upload lector bin/*.bin --clobber
             gh release edit lector --notes "$NOTAS" --prerelease
           else
-            gh release create lector bin/*.bin --title "Lector de impactos (firmware ESP32)" --notes "$NOTAS" --prerelease --latest=false
+            gh release create lector bin/*.bin --title "Lector de impactos (ESP32 y app para móvil viejo)" --notes "$NOTAS" --prerelease --latest=false
           fi
