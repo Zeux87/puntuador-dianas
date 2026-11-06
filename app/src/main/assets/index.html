@@ -92,6 +92,7 @@ select{background:var(--surface);border:1px solid var(--line);border-radius:8px;
 .editbar button svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .editbar button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .editbar button.del:not(:disabled){color:#ffb27a;border-color:rgba(255,138,31,.6)}
+.editbar button.zero[data-arm="1"]{background:#c0392b;border-color:#c0392b;color:#fff}
 .editbar button:disabled{opacity:.4;cursor:default}
 .editbar button:focus-visible,.padov button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .padov{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:grid;grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,42px);gap:4px;line-height:1}
@@ -383,6 +384,7 @@ html.camopen,html.camopen body{overflow:hidden}
           <button id="eAdd" type="button" aria-pressed="false" aria-label="Añadir impactos tocando la foto"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Añadir</button>
           <button id="eMove" type="button" aria-pressed="false" aria-label="Mostrar flechas para mover el impacto"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg>Mover</button>
           <button id="eDel" class="del" type="button" aria-label="Borrar el impacto seleccionado"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Borrar</button>
+          <button id="eZero" class="zero" type="button" aria-label="Quitar todos los impactos y empezar de cero"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/></svg><span>A cero</span></button>
         </div>
         <div id="padOv" class="padov" hidden>
           <button type="button" data-dx="0" data-dy="-1" aria-label="Mover arriba">↑</button>
@@ -409,6 +411,7 @@ html.camopen,html.camopen body{overflow:hidden}
       <div class="row">
         <button id="addMode" class="btn" type="button" aria-pressed="false">+ Añadir impacto</button>
         <button id="del" class="btn danger" type="button" disabled>Eliminar impacto</button>
+        <button id="zeroBtn" class="btn danger" type="button" disabled>Poner impactos a cero</button>
         <button id="calib" class="btn" type="button">Calibrar a mano</button>
         <button id="auto" class="btn" type="button">Volver a detectar</button>
         <button id="viewToggle" class="btn" type="button">Ver foto entera</button>
@@ -429,6 +432,7 @@ html.camopen,html.camopen body{overflow:hidden}
           <li>Los dobles se marcan en naranja como dudosos. Revísalos y arrastra cada impacto a su sitio.</li>
           <li>Para ver los impactos de cerca, pellizca la foto, toca dos veces o usa los botones + y −. Con la foto ampliada, arrastra en una zona vacía para moverte.</li>
           <li>Sobre la foto tienes los botones Añadir, Mover y Borrar. Toca un impacto y muévelo con las flechas que salen sobre la foto, de 0,1 en 0,1 mm (mantén pulsado para ir más rápido).</li>
+          <li>«A cero» (sobre la foto) o «Poner impactos a cero» quita todos los impactos de la diana y empieza de cero; pide un segundo toque para confirmar. Úsalo con el lector si las barras del portablancos salen como impactos.</li>
           <li>Si no localiza la diana, usa «Calibrar a mano»: toca el centro y después el borde del negro.</li>
           <li>La puntuación sigue la regla ISSF: cuenta el anillo más alto que toque el perdigón de 4,5 mm.</li>
         </ul>
@@ -1947,6 +1951,7 @@ function syncEditBar(){
   $('eMove').disabled = !sel;
   $('eMove').setAttribute('aria-pressed', sel && padOn ? 'true' : 'false');
   $('eDel').disabled = !sel;
+  syncZero();
 }
 function toggleAdd(){
   St.mode = St.mode === 'add' ? 'edit' : 'add';
@@ -1954,6 +1959,39 @@ function toggleAdd(){
   syncControls();
 }
 function delSel(){ if (St.sel < 0) return; St.shots.splice(St.sel, 1); St.sel = -1; update(); }
+
+/* Poner a cero: quita todos los impactos de la diana actual y se empieza a contar desde aquí.
+   Sirve sobre todo con el lector: las barras del portablancos salen como impactos al cargar la diana.
+   Se conservan la foto y la calibración; con el lector, los siguientes disparos se cuentan desde esta foto.
+   Se pide un segundo toque para no borrarlo todo sin querer. */
+let ceroArm = null;
+function syncZero(){
+  const ok = !!St.cal && St.shots.length > 0;
+  if (!ok && ceroArm){ clearTimeout(ceroArm); ceroArm = null; }
+  const arm = !!ceroArm;
+  $('zeroBtn').disabled = !ok;
+  $('zeroBtn').textContent = arm ? 'Pulsa otra vez para poner a cero' : 'Poner impactos a cero';
+  $('eZero').disabled = !ok;
+  $('eZero').dataset.arm = arm ? '1' : '0';
+  $('eZero').querySelector('span').textContent = arm ? '¿Seguro?' : 'A cero';
+}
+function ponerACero(){
+  if (!St.cal || !St.shots.length) return;
+  if (!ceroArm){
+    ceroArm = setTimeout(() => { ceroArm = null; syncZero(); }, 3500);
+    syncZero();
+    return;
+  }
+  clearTimeout(ceroArm); ceroArm = null;
+  const n = St.shots.length;
+  St.shots = []; St.sel = -1;
+  if (St.mode === 'add') St.mode = 'edit';
+  if (St.lector){ Lec.orden = 0; if (St.src) Lec.base = St.src; }
+  St.msg = `<b>Impactos a cero</b> (quitados ${n}). ` + (St.lector
+    ? 'El lector contará los disparos desde ahora, en orden.'
+    : 'Añade los impactos tocando «Añadir», o pulsa «Volver a detectar» para que los busque otra vez.');
+  update();
+}
 function initNudge(){
   let tA = null, tB = null;
   const stop = () => { clearTimeout(tA); clearInterval(tB); tA = tB = null; };
@@ -3638,6 +3676,8 @@ function init(){
   $('del').addEventListener('click', delSel);
   $('eAdd').addEventListener('click', toggleAdd);
   $('eDel').addEventListener('click', delSel);
+  $('eZero').addEventListener('click', ponerACero);
+  $('zeroBtn').addEventListener('click', ponerACero);
   $('eMove').addEventListener('click', () => { padOn = !padOn; try { localStorage.setItem('padOv', padOn ? '1' : '0'); } catch (_) {} update(); });
   $('calib').addEventListener('click', () => { St.mode = 'cal1'; St.calTmp = null; St.view = 'full'; resetZoom(); banner('Toca el centro de la diana.'); update(); });
   $('bannerCancel').addEventListener('click', () => { St.mode = 'edit'; St.calTmp = null; banner(null); if (St.cal) St.view = 'target'; resetZoom(); update(); });
