@@ -89,7 +89,7 @@ public class MainActivity extends ComponentActivity {
     private SharedPreferences prefs;
     private PreviewView vista;
     private LinearLayout panel;
-    private TextView txtRed, txtEstado, txtZoom, txtSens;
+    private TextView txtRed, txtEstado, txtZoom, txtSens, txtError;
     private Button bLuz;
 
     private ProcessCameraProvider proveedor;
@@ -128,10 +128,13 @@ public class MainActivity extends ComponentActivity {
         super.onCreate(b);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         prefs = getSharedPreferences("lector", MODE_PRIVATE);
-        construirInterfaz();
+        guardarErrores();
 
         vig = new Vigilante(this::alAviso);
         vig.setSens(prefs.getInt("sens", 50));
+        construirInterfaz();
+        mostrarErrorAnterior();
+
         srv = new Servidor(rutas);
         srv.iniciar();
 
@@ -146,6 +149,31 @@ public class MainActivity extends ComponentActivity {
         ui.removeCallbacksAndMessages(null);
         srv.parar();
         super.onDestroy();
+    }
+
+    /* ======================= Errores ======================= */
+
+    /** Si la app se cierra por un error, lo guarda para enseñarlo al volver a abrirla. */
+    private void guardarErrores() {
+        final Thread.UncaughtExceptionHandler previo = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((hilo, e) -> {
+            try {
+                java.io.StringWriter sw = new java.io.StringWriter();
+                e.printStackTrace(new java.io.PrintWriter(sw));
+                String t = sw.toString();
+                prefs.edit().putString("error", t.length() > 1500 ? t.substring(0, 1500) : t).commit();
+            } catch (Throwable ignored) {
+            }
+            if (previo != null) previo.uncaughtException(hilo, e);
+        });
+    }
+
+    private void mostrarErrorAnterior() {
+        String e = prefs.getString("error", null);
+        if (e == null) return;
+        prefs.edit().remove("error").apply();
+        txtError.setText("La última vez se cerró por un error (haz una captura y mándasela a Claude):\n" + e);
+        txtError.setVisibility(View.VISIBLE);
     }
 
     /* ======================= Cámara ======================= */
@@ -478,6 +506,12 @@ public class MainActivity extends ComponentActivity {
         TextView titulo = texto(18, true);
         titulo.setText("Lector de dianas");
         panel.addView(titulo);
+
+        txtError = texto(11, false);
+        txtError.setTextColor(Color.rgb(255, 170, 80));
+        txtError.setVisibility(View.GONE);
+        txtError.setOnClickListener(v -> v.setVisibility(View.GONE));
+        panel.addView(txtError);
 
         txtRed = texto(13, false);
         panel.addView(txtRed);
