@@ -108,6 +108,7 @@ public class MainActivity extends ComponentActivity {
     private byte[] evFoto;
     private int fotoW, fotoH;
 
+    private int combo = 0;
     private volatile int anRot = 0;
     private volatile long tAnalisis = 0;
     private volatile String siguienteTipo = null;      // tipo del aviso que sigue a un reajuste
@@ -193,36 +194,86 @@ public class MainActivity extends ComponentActivity {
                 proveedor = f.get();
                 enlazar();
             } catch (Exception e) {
-                txtEstado.setText("No puedo abrir la cámara: " + e.getMessage());
+                txtEstado.setText("No puedo abrir la cámara (" + Build.MODEL + ", Android " + Build.VERSION.RELEASE + "): " + e);
             }
         }, ContextCompat.getMainExecutor(this));
     }
 
+    /** Combinaciones de resoluciones de mayor a menor: los móviles antiguos no admiten todas. */
+    private static final int[][] COMBOS = {
+            // vista previa (0 = sin vista), foto, análisis
+            {1280, 960, 2592, 1944, 640, 480},
+            {640, 480, 1920, 1440, 320, 240},
+            {640, 480, 1280, 960, 320, 240},
+            {0, 0, 1920, 1440, 320, 240},
+            {0, 0, 1280, 960, 320, 240},
+    };
+
     private void enlazar() {
-        Preview prev = new Preview.Builder().setResolutionSelector(res43(1280, 960)).build();
-        prev.setSurfaceProvider(vista.getSurfaceProvider());
-
-        captura = new ImageCapture.Builder()
-                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                .setFlashMode(ImageCapture.FLASH_MODE_OFF)
-                .setJpegQuality(88)
-                .setResolutionSelector(res43(2592, 1944))
-                .build();
-
-        ImageAnalysis analisis = new ImageAnalysis.Builder()
-                .setResolutionSelector(res43(640, 480))
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build();
-        analisis.setAnalyzer(exAnalisis, this::analizar);
-
         vig.pausar(true);                      // no vigila hasta haber enfocado
-        proveedor.unbindAll();
-        camara = proveedor.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, prev, captura, analisis);
+        StringBuilder fallos = new StringBuilder();
+        for (int i = 0; i < COMBOS.length; i++) {
+            int[] c = COMBOS[i];
+            try {
+                proveedor.unbindAll();
+                ImageCapture cap = new ImageCapture.Builder()
+                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                        .setFlashMode(ImageCapture.FLASH_MODE_OFF)
+                        .setJpegQuality(88)
+                        .setResolutionSelector(res43(c[2], c[3]))
+                        .build();
+                ImageAnalysis an = new ImageAnalysis.Builder()
+                        .setResolutionSelector(res43(c[4], c[5]))
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .build();
+                an.setAnalyzer(exAnalisis, this::analizar);
+                if (c[0] > 0) {
+                    Preview prev = new Preview.Builder().setResolutionSelector(res43(c[0], c[1])).build();
+                    prev.setSurfaceProvider(vista.getSurfaceProvider());
+                    camara = proveedor.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, prev, cap, an);
+                } else {
+                    camara = proveedor.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, cap, an);
+                }
+                captura = cap;
+                combo = i;
+                break;
+            } catch (Exception e) {
+                camara = null;
+                fallos.append("\n· ").append(i + 1).append(": ").append(e.getClass().getSimpleName()).append(' ').append(e.getMessage());
+            }
+        }
+        if (camara == null) {
+            txtEstado.setText("No puedo abrir la cámara en este móvil (" + Build.MODEL + ", Android " + Build.VERSION.RELEASE + "):" + fallos);
+            return;
+        }
+        // Errores de la cámara después de abrirla (otra app usándola, cámara desactivada…)
+        camara.getCameraInfo().getCameraState().observe(this, st -> {
+            if (st.getError() != null) {
+                String que;
+                switch (st.getError().getCode()) {
+                    case androidx.camera.core.CameraState.ERROR_CAMERA_IN_USE:
+                    case androidx.camera.core.CameraState.ERROR_MAX_CAMERAS_IN_USE:
+                        que = "otra app está usando la cámara: ciérrala";
+                        break;
+                    case androidx.camera.core.CameraState.ERROR_CAMERA_DISABLED:
+                        que = "la cámara está desactivada en este móvil";
+                        break;
+                    case androidx.camera.core.CameraState.ERROR_CAMERA_FATAL_ERROR:
+                        que = "fallo grave de la cámara: reinicia el móvil";
+                        break;
+                    default:
+                        que = "código " + st.getError().getCode();
+                }
+                txtEstado.setText("Error de cámara: " + que + ".");
+            }
+        });
 
         float z = prefs.getFloat("zoom", 0f);
         camara.getCameraControl().setLinearZoom(z);
         bLuz.setVisibility(camara.getCameraInfo().hasFlashUnit() ? View.VISIBLE : View.GONE);
-        txtEstado.setText("Preparando la cámara…");
+        txtEstado.setText(COMBOS[combo][0] == 0
+                ? "Este móvil no admite vista previa a la vez: mira la imagen en el Puntuador. Preparando…"
+                : "Preparando la cámara…");
         ui.postDelayed(() -> fijar(null, false), 1500);
     }
 
@@ -249,7 +300,9 @@ public class MainActivity extends ComponentActivity {
         txtEstado.setText("Enfocando…");
         Camera2CameraControl c2 = Camera2CameraControl.from(camara.getCameraControl());
         c2.clearCaptureRequestOptions();
-        MeteringPoint p = punto != null ? punto : vista.getMeteringPointFactory().createPoint(vista.getWidth() / 2f, vista.getHeight() / 2f);
+        MeteringPoint p = punto != null ? punto
+                : COMBOS[combo][0] > 0 ? vista.getMeteringPointFactory().createPoint(vista.getWidth() / 2f, vista.getHeight() / 2f)
+                : new androidx.camera.core.SurfaceOrientedMeteringPointFactory(1f, 1f).createPoint(0.5f, 0.5f);
         FocusMeteringAction a = new FocusMeteringAction.Builder(p,
                 FocusMeteringAction.FLAG_AF | FocusMeteringAction.FLAG_AE | FocusMeteringAction.FLAG_AWB)
                 .disableAutoCancel()
