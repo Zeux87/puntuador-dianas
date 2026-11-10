@@ -19,6 +19,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.Proxy;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +30,8 @@ import java.util.List;
  * El lector crea su propia red WiFi sin internet. La app se une a ella solo para hablar con el lector
  * (el resto del móvil sigue usando sus datos), pregunta cada poco por /estado y, cuando hay un aviso
  * nuevo, descarga su foto y se la pasa a la página.
+ * Si el móvil tiene una VPN activa, Android no deja a la app elegir la red WiFi: entonces se prueba
+ * por el camino normal del móvil (funciona si la VPN deja pasar la red local) y, si no, se avisa.
  */
 final class Lector {
 
@@ -47,6 +50,10 @@ final class Lector {
     private volatile boolean activo = false;
     private volatile Network red = null;
     private volatile String base = null;
+    /** Con VPN: las peticiones van por el camino normal del móvil, sin atarlas a la red WiFi. */
+    private volatile boolean directo = false;
+    /** Android ha negado usar la red WiFi a causa de una VPN. */
+    private volatile boolean vpnBloquea = false;
     private volatile boolean pedida = false;
     private volatile boolean rechazada = false;
     private ConnectivityManager.NetworkCallback cb = null;
@@ -64,6 +71,7 @@ final class Lector {
 
     synchronized void conectar() {
         rechazada = false;
+        vpnBloquea = false;
         if (activo) {
             if (red == null && !pedida) pedirRed();
             return;
@@ -81,6 +89,7 @@ final class Lector {
         soltarRed();
         red = null;
         base = null;
+        directo = false;
         avisar("desconectado", "Lector desconectado.", null);
     }
 
@@ -112,7 +121,9 @@ final class Lector {
                 if (red != null && base == null) {
                     base = buscarBase(red);
                     if (base == null) {
-                        avisar("buscando", "Conectado a la red " + RED + ", pero no encuentro el lector en ella. ¿Está abierta la app Lector o encendido el ESP32?", null);
+                        avisar("buscando", vpnBloquea || hayVpn()
+                                ? TEXTO_VPN
+                                : "Conectado a la red " + RED + ", pero no encuentro el lector en ella. ¿Está abierta la app Lector o encendido el ESP32?", null);
                         dormir(1500);
                         continue;
                     }
@@ -127,21 +138,20 @@ final class Lector {
                             ultimoIntento = ahora;
                             pedirRed();
                         }
-                        avisar("buscando", rechazada
-                                ? "No me he podido unir a la red " + RED + ". Enciende el lector y pulsa «Conectar» otra vez, o únete a esa red desde los ajustes de WiFi."
-                                : "Buscando el lector… Si Android pregunta, acepta unirte a la red " + RED + ".", null);
+                        avisar("buscando", textoSinLector(), null);
                         dormir(1500);
                         continue;
                     }
                 }
 
                 String txt = pedirTexto("/estado");
-                if (txt == null) {
+                if (!esLector(txt)) {
                     if (++fallos >= 4) {
                         avisar("buscando", "He perdido el lector. Comprueba que está encendido y cerca.", null);
                         if (fallos >= 8) {
                             red = null;
                             base = null;
+                            directo = false;
                         }
                     }
                     dormir(700);
@@ -188,6 +198,29 @@ final class Lector {
         }
     }
 
+    private static final String TEXTO_VPN = "No llego al lector porque este móvil tiene una VPN activa. "
+            + "Desactívala (o excluye Puntuador en la VPN), comprueba que sigues en la WiFi del lector y pulsa «Conectar».";
+
+    /** Explica por qué no aparece el lector, con lo que se sabe de las redes del móvil. */
+    private String textoSinLector() {
+        if (vpnBloquea || hayVpn()) return TEXTO_VPN;
+        List<String> puertas = puertasWifi();
+        if (!puertas.isEmpty()) {
+            String p = puertas.get(0);
+            return "Este móvil está en una WiFi (puerta de enlace " + p + "), pero el lector no responde en ella. "
+                    + "Comprueba que es la zona WiFi del móvil lector, que la app Lector está abierta y que la dirección que muestra es "
+                    + p + ". Si Android avisa de que esa WiFi no tiene internet, elige mantener la conexión.";
+        }
+        return rechazada
+                ? "No me he podido unir a la red " + RED + ". Enciende el lector y pulsa «Conectar» otra vez, o únete a esa red desde los ajustes de WiFi."
+                : "Buscando el lector… Si Android pregunta, acepta unirte a la red " + RED + ".";
+    }
+
+    /** La respuesta de /estado es la del lector (y no, por ejemplo, la página de un router). */
+    private static boolean esLector(String txt) {
+        return txt != null && txt.trim().startsWith("{") && txt.contains("\"seq\"");
+    }
+
     private void avisar(String estado, String texto, JSONObject info) {
         try {
             JSONObject o = new JSONObject();
@@ -207,6 +240,7 @@ final class Lector {
             for (Network n : cm.getAllNetworks()) {
                 NetworkCapabilities c = cm.getNetworkCapabilities(n);
                 if (c == null || !c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) continue;
+                if (c.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) continue;   // una VPN sobre WiFi no es la red del lector
                 String b = buscarBase(n);
                 if (b != null) {
                     base = b;
@@ -220,10 +254,49 @@ final class Lector {
 
     /** Dirección del lector dentro de una red: el ESP32 está en 192.168.4.1; el móvil con zona WiFi es la puerta de enlace. */
     private String buscarBase(Network n) {
+        boolean vpn = hayVpn();
         for (String b : candidatos(n)) {
-            if (pedirTexto(n, b + "/estado", 1500) != null) return b;
+            if (esLector(pedirTexto(n, b + "/estado", 1500))) {
+                directo = false;
+                return b;
+            }
+            // Con VPN, Android puede negar el uso directo de la WiFi: se prueba por el camino normal
+            if ((vpn || vpnBloquea) && esLector(pedirTexto(null, b + "/estado", 1500))) {
+                directo = true;
+                return b;
+            }
         }
         return null;
+    }
+
+    private boolean hayVpn() {
+        try {
+            for (Network n : cm.getAllNetworks()) {
+                NetworkCapabilities c = cm.getNetworkCapabilities(n);
+                if (c != null && c.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return true;
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
+    /** Puertas de enlace de las redes WiFi a las que está unido el móvil (para explicar dónde se ha buscado). */
+    private List<String> puertasWifi() {
+        List<String> r = new ArrayList<>();
+        try {
+            for (Network n : cm.getAllNetworks()) {
+                NetworkCapabilities c = cm.getNetworkCapabilities(n);
+                if (c == null || !c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || c.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) continue;
+                LinkProperties lp = cm.getLinkProperties(n);
+                if (lp == null) continue;
+                for (RouteInfo ri : lp.getRoutes()) {
+                    InetAddress g = ri.getGateway();
+                    if (g instanceof Inet4Address && !g.isAnyLocalAddress() && !r.contains(g.getHostAddress())) r.add(g.getHostAddress());
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return r;
     }
 
     private List<String> candidatos(Network n) {
@@ -304,10 +377,10 @@ final class Lector {
         Network n = red;
         String b = base;
         if (n == null || b == null) return null;
-        return pedirTexto(n, b + ruta, 2500);
+        return pedirTexto(directo ? null : n, b + ruta, 2500);
     }
 
-    private static String pedirTexto(Network n, String url, int espera) {
+    private String pedirTexto(Network n, String url, int espera) {
         byte[] b = pedir(n, url, espera, 4000);
         return b == null ? null : new String(b, java.nio.charset.StandardCharsets.UTF_8);
     }
@@ -316,13 +389,15 @@ final class Lector {
         Network n = red;
         String b = base;
         if (n == null || b == null) return null;
-        return pedir(n, b + ruta, 3000, 15000);
+        return pedir(directo ? null : n, b + ruta, 3000, 15000);
     }
 
-    private static byte[] pedir(Network n, String url, int espera, int lectura) {
+    /** Con n == null la petición no se ata a ninguna red: sale por donde el móvil decida. */
+    private byte[] pedir(Network n, String url, int espera, int lectura) {
         HttpURLConnection c = null;
         try {
-            c = (HttpURLConnection) n.openConnection(new URL(url));
+            URL u = new URL(url);
+            c = (HttpURLConnection) (n != null ? n.openConnection(u) : u.openConnection(Proxy.NO_PROXY));
             c.setConnectTimeout(espera);
             c.setReadTimeout(lectura);
             c.setUseCaches(false);
@@ -335,6 +410,15 @@ final class Lector {
                 return out.toByteArray();
             }
         } catch (Exception e) {
+            // Con una VPN que no se puede esquivar, Android niega atar la conexión a la WiFi (EPERM)
+            if (n != null) {
+                for (Throwable t = e; t != null; t = t.getCause()) {
+                    if (String.valueOf(t.getMessage()).contains("EPERM")) {
+                        vpnBloquea = true;
+                        break;
+                    }
+                }
+            }
             return null;
         } finally {
             if (c != null) c.disconnect();
