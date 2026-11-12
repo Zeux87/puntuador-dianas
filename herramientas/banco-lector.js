@@ -9,6 +9,9 @@
 //   MALA=1 ...  el lector manda una posición equivocada (lejos del impacto)
 //   PIERDE=1 ... el lector no avisa de uno de cada tres impactos (deben aparecer con el siguiente)
 //   PERSP=0.5 ... cámara muy inclinada (por ejemplo colocada encima de la diana): la diana se ve achatada
+//   REAL=1 ...  montaje real: cámara encima de la diana (perspectiva de verdad), logotipo impreso en la
+//                esquina, barras del portablancos tocando el negro y la cámara temblando entre fotos
+//   FALSOS=1 ... entre impacto e impacto el lector manda un aviso falso (sin agujero nuevo): no debe sumar nada
 //   V=1 ...   muestra cada impacto
 const { chromium } = require('playwright');
 const file = process.argv[2], FONDO = +(process.env.FONDO || 150);
@@ -36,15 +39,17 @@ function makeCases(){
   await pg.goto('file://' + require('path').resolve(file));
   await pg.waitForTimeout(400);
   if (process.env.SIN_PISTA) await pg.evaluate(() => { window.__sinPista = true; });
+  for (const k of ['REAL', 'FALSOS']) if (process.env[k]) await pg.evaluate(k => { window['__' + k] = true; }, k);
   if (process.env.MALA) await pg.evaluate(() => { window.__mala = true; });
   if (process.env.PIERDE) await pg.evaluate(() => { window.__pierde = true; });
-  let T = { n: 0, ok: 0, dud: 0, nada: 0, err: 0, maxe: 0, dScore: 0, mas: 0, rec: 0, perd: 0 };
+  let T = { n: 0, ok: 0, dud: 0, nada: 0, err: 0, maxe: 0, dScore: 0, mas: 0, rec: 0, perd: 0, falsos: 0, nFalsos: 0, sinCal: 0 };
   for (const c of makeCases()){
     const res = await pg.evaluate(async ({ c, FONDO }) => {
       function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
       const d = DISC.pistola, WW = 2048, HH = 1536, s = WW * c.frac / 170, rnd = rng(c.seed + 9);
       let pista = { x: 0, y: 0 };
-      const SIN_PISTA = !!window.__sinPista;
+      const SIN_PISTA = !!window.__sinPista, REAL = !!window.__REAL;
+      let falsos = 0, nFalsos = 0;
       const holeShape = c.shots.map(() => Array.from({ length: 41 }, () => 0.94 + rnd() * 0.1));
       const frame = async (nShots, f) => {
         const cv = document.createElement('canvas'); cv.width = WW; cv.height = HH;
@@ -68,6 +73,11 @@ function makeCases(){
           x.fillStyle = r < d.negro * s ? '#d9dbd2' : '#1a1a1a';
           for (const [ux, uy] of [[0,-1],[1,0],[0,1],[-1,0]]) x.fillText(String(n), ux * r, uy * r);
         }
+        if (REAL){
+          x.fillStyle = '#1d3f8f'; x.font = 'bold italic ' + Math.round(8 * s) + 'px sans-serif'; x.textAlign = 'left';
+          x.fillText('MUNDILAR', -80 * s, -77 * s); x.fillText('AIRGUNS', -62 * s, -69 * s);
+          x.fillStyle = '#17181a'; x.fillRect(-24 * s, 27 * s, 6 * s, 80 * s); x.fillRect(20 * s, 26 * s, 6 * s, 80 * s);
+        }
         for (let i = 0; i < nShots; i++){
           const [sx, sy] = c.shots[i], px = sx * s, py = -sy * s;
           x.beginPath();
@@ -80,7 +90,22 @@ function makeCases(){
           x.strokeStyle = 'rgba(40,40,40,0.5)'; x.lineWidth = 0.25 * s; x.stroke();
         }
         x.restore();
-        const im = x.getImageData(0, 0, WW, HH), dd = im.data;
+        let im = x.getImageData(0, 0, WW, HH), dd = im.data;
+        if (REAL){
+          // Cámara encima: lo de arriba se ve más grande que lo de abajo; además tiembla un poco entre fotos
+          const src = dd, out = new Uint8ClampedArray(src.length), kk = 0.22 / (HH / 2), cx = WW / 2, cy = HH / 2;
+          const tx = (rnd() - 0.5) * 1.6 * f, ty = (rnd() - 0.5) * 1.6 * f, an = (rnd() - 0.5) * 0.002 * f, ca = Math.cos(an), sa = Math.sin(an);
+          for (let v = 0; v < HH; v++) for (let u = 0; u < WW; u++){
+            const u1 = u - cx - tx, v1 = v - cy - ty, u2 = u1 * ca - v1 * sa, v2 = u1 * sa + v1 * ca;
+            const Y = v2 / (1 + kk * v2), X = u2 * (1 - kk * Y);
+            const fx = X + cx, fy = Y + cy, xi = Math.floor(fx), yi = Math.floor(fy), o = (v * WW + u) * 4;
+            if (xi < 0 || yi < 0 || xi >= WW - 1 || yi >= HH - 1){ out[o] = 60; out[o + 1] = 64; out[o + 2] = 62; out[o + 3] = 255; continue; }
+            const ax = fx - xi, ay = fy - yi, i0 = (yi * WW + xi) * 4;
+            for (let q = 0; q < 3; q++) out[o + q] = (src[i0 + q] * (1 - ax) + src[i0 + 4 + q] * ax) * (1 - ay) + (src[i0 + WW * 4 + q] * (1 - ax) + src[i0 + WW * 4 + 4 + q] * ax) * ay;
+            out[o + 3] = 255;
+          }
+          im = new ImageData(out, WW, HH); dd = im.data;
+        }
         for (let i = 0; i < dd.length; i += 4){ const n = (rnd() - 0.5) * c.noise; for (let k = 0; k < 3; k++) dd[i + k] = dd[i + k] * luz + n; }
         x.putImageData(im, 0, 0);
         const url = cv.toDataURL('image/jpeg', 0.88);
@@ -93,6 +118,12 @@ function makeCases(){
       const ini = St.shots.length, out = [], perdidos = [];
       let mas = 0, rec = 0;
       for (let i = 0; i < c.shots.length; i++){
+        if (window.__FALSOS && i > 0){
+          // Aviso falso: misma diana (la cámara ha temblado), con la pista sobre el logotipo o sobre un número
+          const a0 = St.shots.length, imF = await frame(i, 1);
+          lectorEvento({ tipo: 'impacto', x: i % 2 ? 0.2 : 0.5, y: i % 2 ? 0.18 : 0.3 }, imF);
+          nFalsos++; if (St.shots.length > a0){ falsos += St.shots.length - a0; St.shots.length = a0; }
+        }
         const im = await frame(i + 1, 1);
         // Aviso perdido: el lector no dice nada de este impacto (no pegado a otro) y sigue con el siguiente
         if (window.__pierde && i % 3 === 1 && i < c.shots.length - 1 && c.shots.every((t, j) => j === i || Math.hypot(t[0] - c.shots[i][0], t[1] - c.shots[i][1]) > 14)){ perdidos.push(i); out.push('perdido'); continue; }
@@ -110,7 +141,7 @@ function makeCases(){
         out.push([inf.mx, inf.my, inf.dec, sh.dudoso ? 1 : 0]);
       }
       Lec.on = false;
-      return { ini, out, cal: !!St.cal, mas, rec, perd: perdidos.length + rec };
+      return { ini, out, cal: !!St.cal, falsos, nFalsos, mas, rec, perd: perdidos.length + rec };
     }, { c, FONDO });
     let ok = 0, dud = 0, nada = 0, err = 0, maxe = 0, ds = 0;
     let nAv = 0;
@@ -125,10 +156,10 @@ function makeCases(){
       if (process.env.V) console.log(`   ${i + 1}: error ${e.toFixed(2)} mm, ${o[2]} (real ${sc})${o[3] ? ' dudoso' : ''}`);
     });
     const n = res.out.filter(o => o && o !== 'perdido').length;
-    T.n += nAv; T.mas += res.mas; T.rec += res.rec; T.perd += res.perd; T.ok += ok; T.dud += dud; T.nada += nada; T.err += err; T.maxe = Math.max(T.maxe, maxe); T.dScore += ds;
-    console.log(`caso ${c.seed}: frac=${c.frac} persp=${c.persp} ${c.mueve ? 'papel se mueve' : ''} → de partida ${res.ini}, a <1 mm ${ok}/${nAv}, sin marcar ${nada}, dudosos ${dud}, error medio ${(n ? err / n : 0).toFixed(2)} mm, máx ${maxe.toFixed(2)} mm`);
+    T.n += nAv; T.mas += res.mas; T.falsos += res.falsos; T.nFalsos += res.nFalsos; if (!res.cal) T.sinCal++; T.rec += res.rec; T.perd += res.perd; T.ok += ok; T.dud += dud; T.nada += nada; T.err += err; T.maxe = Math.max(T.maxe, maxe); T.dScore += ds;
+    console.log(`caso ${c.seed}: frac=${c.frac} persp=${c.persp} ${c.mueve ? 'papel se mueve' : ''} → ${res.cal ? '' : 'DIANA NO LOCALIZADA, '}de partida ${res.ini}, a <1 mm ${ok}/${nAv}, sin marcar ${nada}, dudosos ${dud}, error medio ${(n ? err / n : 0).toFixed(2)} mm, máx ${maxe.toFixed(2)} mm`);
   }
   const n = T.n - T.nada;
-  console.log(`TOTAL (fondo ${FONDO}): a <1 mm ${T.ok}/${T.n}, sin marcar ${T.nada}, dudosos ${T.dud}, error medio ${(T.err / n).toFixed(3)} mm, máx ${T.maxe.toFixed(2)} mm, error de puntuación medio ${(T.dScore / n).toFixed(3)}, fantasmas ${T.mas}, perdidos recuperados ${T.rec}/${T.perd}`);
+  console.log(`TOTAL (fondo ${FONDO}): a <1 mm ${T.ok}/${T.n}, sin marcar ${T.nada}, dudosos ${T.dud}, error medio ${(T.err / n).toFixed(3)} mm, máx ${T.maxe.toFixed(2)} mm, error de puntuación medio ${(T.dScore / n).toFixed(3)}, fantasmas ${T.mas}, perdidos recuperados ${T.rec}/${T.perd}, sumados en avisos falsos ${T.falsos}/${T.nFalsos}, dianas sin localizar ${T.sinCal}/8`);
   await b.close();
 })();

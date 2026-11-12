@@ -68,7 +68,7 @@ final class Vigilante {
     private int umbral() {
         int tope = 40 - sens / 4;
         if (ruido < 0) return tope;
-        return Math.max(8, Math.min(tope, Math.round(ruido * 8) + 4));
+        return Math.max(12, Math.min(tope, Math.round(ruido * 8) + 6));
     }
 
     private int minPix() {

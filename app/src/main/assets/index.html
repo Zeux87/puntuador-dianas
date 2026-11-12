@@ -2647,10 +2647,7 @@ function lectorImpacto(o, im){
   if (pista && !(r && r.ok && r.conf >= 0.6)){
     const r2 = busca(null);
     if (r2 && r2.ok && (!r || !r.ok || (r2.conf >= 0.6 && r2.fill > r.fill * 1.5))) r = r2;
-    else if (r2 && r2.cand && (!r || !r.cand || (!r.ok && r2.fill > r.fill * 1.5))) r = r2;
   }
-  const hmm = pista ? toMM(St.cal, d.negro, pista.x, pista.y) : null;
-  const dentro = hmm && Math.hypot(hmm.x, hmm.y) < outerR(d);
   const hay = r && (r.ok || r.cand);
   const movido = r && Math.hypot(r.dx, r.dy) * r.k >= 0.75;
   // Si el papel se ha movido un poco con el impacto, se mueven con él la calibración y los impactos
@@ -2662,18 +2659,17 @@ function lectorImpacto(o, im){
   P.t0 = St.P.t0; St.P = P; St.src = im; St.hi = null;
   // Si no se ha encontrado nada se sigue comparando con la foto anterior: un impacto que ahora
   // no se distingue vuelve a tener otra oportunidad con el aviso siguiente
-  if (hay || dentro || movido) Lec.base = im;
+  if (hay || movido) Lec.base = im;
   if (r && r.ok){
     // Impactos que el lector no avisó en su momento y aparecen ahora en la misma comparación
     (r.otros || []).forEach(q => lectorAnadir(q.x, q.y, true, true));
     lectorAnadir(r.x, r.y, r.conf < 0.6);
     return;
   }
-  // El lector ha visto algo pero en la foto no se distingue: se propone la posición aproximada,
-  // siempre que caiga dentro de los anillos (fuera de ellos no puede ser un impacto que puntúe)
+  // Se ve algo, pero flojo: se propone en naranja. Si no se ve nada no se suma nada: el lector avisa
+  // también cuando la cámara tiembla o cambia la luz, y la foto grande es la que decide
   if (r && r.cand) lectorAnadir(r.x, r.y, true);
-  else if (dentro) lectorAnadir(pista.x, pista.y, true);
-  else { St.msg = '<b>El lector ha notado un cambio, pero no encuentro un impacto nuevo.</b> Si has disparado, añádelo con «Añadir».'; update(); }
+  else { St.msg = 'El lector ha avisado, pero en la foto no hay ningún impacto nuevo. Si has disparado y no lo marco, añádelo con «Añadir».'; update(); }
 }
 
 function lectorAnadir(x, y, dudoso, callado){
@@ -2741,20 +2737,47 @@ function lectorLocaliza(A, B, P, cal, d, pista){
     }
   }
   const { dx: sx, dy: sy, off } = best;
-  // Diferencia con el brillo corregido
+  // Solo cuenta la zona que puntúa (hasta el anillo 1 más un perdigón): fuera de ella están el
+  // logotipo, los bordes del papel y las pinzas, que cambian con cualquier temblor de la cámara
+  const dentro = new Uint8Array(W * H), rMax = outerR(d) + PELLET, PASO = 4;
+  for (let y = 0; y < H; y += PASO) for (let x = 0; x < W; x += PASO){
+    const mm = toMM(cal, d.negro, x0 + (Math.min(W - 1, x + PASO / 2)) / k, y0 + (Math.min(H - 1, y + PASO / 2)) / k);
+    if (Math.hypot(mm.x, mm.y) > rMax) continue;
+    for (let yy = y; yy < Math.min(H, y + PASO); yy++) dentro.fill(1, yy * W + x, yy * W + Math.min(W, x + PASO));
+  }
+  // Diferencia con el brillo corregido. A cada punto se le descuenta lo que explicaría un pequeño
+  // desajuste entre las dos fotos (la cámara tiembla con el disparo): junto a una línea, un número o
+  // un dibujo impresos basta medio píxel para que cambie mucho el brillo sin que haya agujero
   const df = new Float32Array(W * H);
+  const hist = new Uint32Array(256); let tot = 0;
   for (let y = M; y < H - M; y++) for (let x = M; x < W - M; x++){
     const i = y * W + x;
+    if (!dentro[i]) continue;
     df[i] = Math.abs(gb[i] - bil(x + sx, y + sy) - off);
+    hist[Math.min(255, df[i] | 0)]++; tot++;
   }
+  if (!tot) return null;
   // Umbral según el ruido de la propia pareja de fotos
-  const hist = new Uint32Array(256); let tot = 0;
-  for (let i = 0; i < df.length; i++){ hist[Math.min(255, df[i] | 0)]++; tot++; }
   let acc = 0, p90 = 0;
   for (let v = 0; v < 256; v++){ acc += hist[v]; if (acc >= tot * 0.9){ p90 = v; break; } }
   const T = Math.max(10, p90 * 2.5);
   const w = new Float32Array(W * H);
-  for (let i = 0; i < w.length; i++) w[i] = df[i] > T ? df[i] - T * 0.5 : 0;
+  // Borde impreso: contraste local ya presente en la foto anterior (mínimo de las dos, ensanchado)
+  const borde = new Float32Array(W * H);
+  for (let y = M + 1; y < H - M - 1; y++) for (let x = M + 1; x < W - M - 1; x++){
+    const i = y * W + x;
+    let lo = 255, hi = 0;
+    for (let yy = -1; yy <= 1; yy++) for (let xx = -1; xx <= 1; xx++){ const va = ga[i + yy * W + xx]; if (va < lo) lo = va; if (va > hi) hi = va; }
+    borde[i] = hi - lo;
+  }
+  for (let y = M + 2; y < H - M - 2; y++) for (let x = M + 2; x < W - M - 2; x++){
+    const i = y * W + x;
+    if (!dentro[i]) continue;
+    let b = 0;
+    for (let yy = -1; yy <= 1; yy++) for (let xx = -1; xx <= 1; xx++){ const v = borde[i + yy * W + xx]; if (v > b) b = v; }
+    const Tl = T + Math.max(0, b - 2 * T) * 0.6;
+    w[i] = df[i] > Tl ? df[i] - Tl * 0.5 : 0;
+  }
   // Mejor posición de un disco del tamaño del perdigón (primero con una caja, luego con el disco exacto)
   const r = hrP * k, half = Math.max(1, Math.round(r * 0.85));
   const I = new Float64Array((W + 1) * (H + 1));
@@ -2790,8 +2813,12 @@ function lectorLocaliza(A, B, P, cal, d, pista){
     if (Math.hypot(x - fx, y - fy) < r * 3 || !cerca(x, y)) continue;
     const v = box(x, y); if (v > segundo) segundo = v;
   }
-  const fill = bd.fill, claro = segundo < bs * 0.6;
+  // Un agujero de verdad llena buena parte del disco, con fuerza, y no tiene rivales; el ruido y los
+  // temblores dejan manchas flojas y repartidas. Sin esto, cada aviso falso del lector sumaba un impacto
+  const fill = bd.fill, z = bd.sum / (Math.PI * r * r) / T, rival = segundo / bs, claro = rival < 0.6;
   const conf = Math.min(1, fill / 0.45) * (claro ? 1 : 0.5);
+  const ok = fill >= 0.3 || (fill >= 0.17 && z >= 0.3 && rival < 0.5);
+  const cand = ok || (fill >= 0.12 && z >= 0.2 && rival < 0.5);
   // Otros agujeros igual de claros y bien separados: impactos que el lector no avisó a tiempo
   const otros = [];
   if (fill >= 0.45){
@@ -2813,7 +2840,7 @@ function lectorLocaliza(A, B, P, cal, d, pista){
     }
   }
   return {
-    ok: fill >= 0.15, cand: fill >= 0.06, conf, fill, k, otros,
+    ok, cand, conf, fill, k, otros,
     x: x0 + (fx + 0.5) / k, y: y0 + (fy + 0.5) / k, dx: -sx / k, dy: -sy / k
   };
 }
