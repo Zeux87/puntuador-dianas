@@ -61,7 +61,7 @@ Cualquier Android 7 o superior con cámara trasera. Ese móvil vigila la diana y
 
 1. **Instala la app** en el móvil viejo: descarga `LectorDianas.apk` de la versión **«lector»** en [Releases](https://github.com/Zeux87/puntuador-dianas/releases/tag/lector) desde ese móvil e instálala (permite instalar apps de ese origen si lo pide).
 2. **Activa su zona WiFi** (Ajustes → Zona WiFi / Punto de acceso): nombre **LineaDeTiro-Lector**, clave **lineadetiro**, seguridad **WPA2**. No necesita SIM ni datos en la mayoría de móviles; si el tuyo no deja activarla sin SIM, dímelo. La app tiene un botón que abre esos ajustes.
-3. **Abre la app Lector** y dale permiso de cámara. Se ve la imagen en horizontal con un panel a la derecha.
+3. **Abre la app Lector** y dale permiso de cámara. Se ve la imagen en horizontal con un panel a la derecha. Para actualizarla más adelante, conecta ese móvil a una WiFi con Internet y pulsa **Buscar actualización** en el panel: descarga e instala sola la versión nueva.
 4. **Encuadra** con el móvil en horizontal, a 30–60 cm de la diana (con el zoom puedes ponerlo más lejos, que es más seguro). Que la diana ocupe la mitad de la imagen o más.
 5. **Enfoca** tocando la diana en la pantalla: enfoca ahí y deja fijos el enfoque, la exposición y el color, para que nada cambie entre disparo y disparo. Si cambias el zoom, vuelve a enfocar sola.
 6. En el Puntuador, crea una sesión **«Con el lector WiFi»** y acepta unirte a **LineaDeTiro-Lector**. En el panel del Lector verás «Puntuador conectado».

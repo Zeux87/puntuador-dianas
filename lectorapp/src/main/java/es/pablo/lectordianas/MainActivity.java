@@ -5,6 +5,7 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.hardware.camera2.CaptureRequest;
@@ -49,12 +50,18 @@ import androidx.camera.core.resolutionselector.ResolutionStrategy;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 import androidx.exifinterface.media.ExifInterface;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -90,7 +97,12 @@ public class MainActivity extends ComponentActivity {
     private PreviewView vista;
     private LinearLayout panel;
     private TextView txtRed, txtEstado, txtZoom, txtSens, txtError;
-    private Button bLuz;
+    private Button bLuz, bAct;
+    private TextView txtAct;
+    // Actualización: el APK y su número de versión están en la versión «lector» de GitHub
+    private static final String URL_BASE = "https://github.com/Zeux87/puntuador-dianas/releases/download/lector/";
+    private volatile int versionNueva = 0;
+    private volatile boolean actualizando = false;
 
     private ProcessCameraProvider proveedor;
     private Camera camara;
@@ -143,6 +155,121 @@ public class MainActivity extends ComponentActivity {
         else permiso.launch(Manifest.permission.CAMERA);
 
         ui.post(refresco);
+        buscarActualizacion(false);
+    }
+
+    /* ======================= Actualización ======================= */
+
+    private int codigoVersion() {
+        try {
+            android.content.pm.PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+            return Build.VERSION.SDK_INT >= 28 ? (int) pi.getLongVersionCode() : pi.versionCode;
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private static HttpURLConnection abrir(String url) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setConnectTimeout(10000);
+        c.setReadTimeout(20000);
+        c.setInstanceFollowRedirects(true);
+        c.setUseCaches(false);
+        return c;
+    }
+
+    private void estadoAct(String t, String boton) {
+        ui.post(() -> {
+            txtAct.setText(t);
+            if (boton != null) bAct.setText(boton);
+        });
+    }
+
+    /** Mira si hay una versión más nueva publicada. Si no la pide el usuario, no molesta cuando no hay conexión. */
+    private void buscarActualizacion(boolean pedida) {
+        if (actualizando) return;
+        if (pedida) estadoAct("Buscando…", null);
+        new Thread(() -> {
+            try {
+                HttpURLConnection c = abrir(URL_BASE + "app-lector-version.txt");
+                int code = c.getResponseCode();
+                if (code != 200) throw new Exception("HTTP " + code);
+                byte[] buf = new byte[32];
+                int n;
+                try (InputStream in = c.getInputStream()) {
+                    n = Math.max(0, in.read(buf));
+                }
+                int num = Integer.parseInt(new String(buf, 0, n, "UTF-8").trim());
+                if (num > codigoVersion()) {
+                    versionNueva = num;
+                    estadoAct("Hay una versión nueva: 1.0." + num + " (tienes la " + version() + ").", "Actualizar a 1.0." + num);
+                } else {
+                    versionNueva = 0;
+                    estadoAct("Versión " + version() + (pedida ? ": es la última." : "."), "Buscar actualización");
+                }
+            } catch (Exception e) {
+                if (pedida) estadoAct("No puedo buscar: este móvil no tiene Internet ahora. Conéctalo a una WiFi con Internet y prueba otra vez.", null);
+            }
+        }).start();
+    }
+
+    private void instalarActualizacion() {
+        final int num = versionNueva;
+        if (num <= 0 || actualizando) return;
+        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
+            } catch (Exception ignored) {
+            }
+            estadoAct("Activa «Permitir de esta fuente» para el Lector, vuelve atrás y pulsa Actualizar otra vez.", null);
+            return;
+        }
+        actualizando = true;
+        estadoAct("Descargando…", null);
+        new Thread(() -> {
+            try {
+                File dir = new File(getCacheDir(), "actualizaciones");
+                if (!dir.exists()) dir.mkdirs();
+                File[] viejos = dir.listFiles();
+                if (viejos != null) for (File v : viejos) v.delete();
+                File destino = new File(dir, "LectorDianas-1.0." + num + ".apk");
+                HttpURLConnection c = abrir(URL_BASE + "LectorDianas.apk");
+                int code = c.getResponseCode();
+                if (code != 200) throw new Exception("HTTP " + code);
+                long total = c.getContentLength();
+                try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(destino)) {
+                    byte[] buf = new byte[16384];
+                    long leido = 0;
+                    int ultimo = -1, n;
+                    while ((n = in.read(buf)) > 0) {
+                        out.write(buf, 0, n);
+                        leido += n;
+                        if (total > 0) {
+                            int pct = (int) (leido * 100 / total);
+                            if (pct >= ultimo + 5) {
+                                ultimo = pct;
+                                estadoAct("Descargando… " + pct + " %", null);
+                            }
+                        }
+                    }
+                }
+                Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".archivos", destino);
+                Intent i = new Intent(Intent.ACTION_VIEW);
+                i.setDataAndType(uri, "application/vnd.android.package-archive");
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                ui.post(() -> {
+                    try {
+                        startActivity(i);
+                    } catch (Exception ignored) {
+                    }
+                });
+                estadoAct("Descargada. Confirma la instalación en la ventana de Android.", null);
+            } catch (Exception e) {
+                estadoAct("No se ha podido descargar la actualización. Revisa la conexión y vuelve a probar.", null);
+            } finally {
+                actualizando = false;
+            }
+        }).start();
     }
 
     @Override
@@ -579,6 +706,14 @@ public class MainActivity extends ComponentActivity {
         panel.addView(bLuz);
         panel.addView(boton("Pantalla oscura", v -> pantallaOscura(true)));
         panel.addView(boton("Zona WiFi del móvil", v -> abrirZonaWifi()));
+        bAct = boton("Buscar actualización", v -> {
+            if (versionNueva > 0) instalarActualizacion();
+            else buscarActualizacion(true);
+        });
+        panel.addView(bAct);
+        txtAct = texto(12, false);
+        txtAct.setText("Versión " + version() + ".");
+        panel.addView(txtAct);
 
         txtZoom = texto(13, false);
         panel.addView(txtZoom);
