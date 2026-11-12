@@ -6,6 +6,11 @@ import java.nio.ByteBuffer;
  * Vigila la diana con imágenes pequeñas en gris (unos 200 píxeles de ancho), igual que el firmware del ESP32:
  * compara cada imagen con una referencia corrigiendo el brillo global. Si cambian pocos píxeles y la imagen
  * se queda quieta dos veces seguidas, es un impacto; si cambian muchos, es una diana nueva («cambio»).
+ *
+ * El umbral se ajusta solo al ruido de la cámara (un agujero sobre el negro cambia muy poco el brillo) y la
+ * posición del impacto es la del grupo de píxeles más denso, no la media de todos: así una sombra o el borde
+ * del papel moviéndose lejos del agujero no se llevan la posición. La app Puntuador confirma luego cada aviso
+ * sobre la foto grande, así que aquí es mejor avisar de más que de menos.
  */
 final class Vigilante {
 
@@ -24,6 +29,9 @@ final class Vigilante {
     private volatile boolean pedirRef = false;
     private volatile int sens = 50;
     private volatile boolean pausado = false;
+    private float ruido = -1;                 // diferencia media entre imágenes seguidas con la escena quieta
+    private static final int CELDA = 8;       // rejilla para localizar el grupo de píxeles cambiados
+    private int[] celN, celX, celY;
 
     Vigilante(Aviso aviso) {
         this.aviso = aviso;
@@ -56,8 +64,11 @@ final class Vigilante {
         return refOk && !pausado;
     }
 
+    /** Tope del umbral según la sensibilidad; por debajo manda el ruido medido. */
     private int umbral() {
-        return 40 - sens / 4;
+        int tope = 40 - sens / 4;
+        if (ruido < 0) return tope;
+        return Math.max(8, Math.min(tope, Math.round(ruido * 8) + 4));
     }
 
     private int minPix() {
@@ -83,6 +94,7 @@ final class Vigilante {
             refOk = false;
             calentando = 0;
             cambiando = false;
+            ruido = -1;
         }
         // Reducción por bloques f×f
         final int area = f * f;
@@ -128,18 +140,63 @@ final class Vigilante {
             sP += c - (prev[i] & 0xFF);
         }
         final int offR = (int) (sR / n), offP = (int) (sP / n), T = umbral();
+        final int gw = dw / CELDA + 1, gh = dh / CELDA + 1;
+        if (celN == null || celN.length != gw * gh) {
+            celN = new int[gw * gh];
+            celX = new int[gw * gh];
+            celY = new int[gw * gh];
+        } else {
+            java.util.Arrays.fill(celN, 0);
+            java.util.Arrays.fill(celX, 0);
+            java.util.Arrays.fill(celY, 0);
+        }
         int cambiados = 0, mov = 0;
-        long sx = 0, sy = 0;
+        long sAbs = 0;
         for (int yy = 2; yy < dh - 2; yy++) {
             int filaI = yy * dw;
             for (int xx = 2; xx < dw - 2; xx++) {
                 int i = filaI + xx, c = cur[i] & 0xFF;
                 if (Math.abs(c - (ref[i] & 0xFF) - offR) > T) {
                     cambiados++;
-                    sx += xx;
-                    sy += yy;
+                    int g = (yy / CELDA) * gw + xx / CELDA;
+                    celN[g]++;
+                    celX[g] += xx;
+                    celY[g] += yy;
                 }
-                if (Math.abs(c - (prev[i] & 0xFF) - offP) > T) mov++;
+                int dp = Math.abs(c - (prev[i] & 0xFF) - offP);
+                sAbs += dp;
+                if (dp > T) mov++;
+            }
+        }
+        // Ruido de la cámara, medido solo con la escena quieta
+        if (!cambiando && mov == 0) {
+            float m = (float) sAbs / Math.max(1, (dw - 4) * (dh - 4));
+            ruido = ruido < 0 ? m : ruido * 0.9f + m * 0.1f;
+        }
+        // Posición: centro del grupo de 3×3 celdas con más píxeles cambiados
+        long sx = 0, sy = 0;
+        int enGrupo = 0;
+        if (cambiados > 0) {
+            int mejor = -1, mgx = 0, mgy = 0;
+            for (int gy = 0; gy < gh; gy++) {
+                for (int gx = 0; gx < gw; gx++) {
+                    int s = 0;
+                    for (int ay = Math.max(0, gy - 1); ay <= Math.min(gh - 1, gy + 1); ay++)
+                        for (int ax = Math.max(0, gx - 1); ax <= Math.min(gw - 1, gx + 1); ax++) s += celN[ay * gw + ax];
+                    if (s > mejor) {
+                        mejor = s;
+                        mgx = gx;
+                        mgy = gy;
+                    }
+                }
+            }
+            for (int ay = Math.max(0, mgy - 1); ay <= Math.min(gh - 1, mgy + 1); ay++) {
+                for (int ax = Math.max(0, mgx - 1); ax <= Math.min(gw - 1, mgx + 1); ax++) {
+                    int g = ay * gw + ax;
+                    enGrupo += celN[g];
+                    sx += celX[g];
+                    sy += celY[g];
+                }
             }
         }
         final int mp = minPix();
@@ -154,7 +211,7 @@ final class Vigilante {
             quietos = mov < mp ? quietos + 1 : 0;
             if (quietos >= 2) {
                 if (cambiados >= mp) {
-                    float fx = (float) sx / cambiados / dw, fy = (float) sy / cambiados / dh;
+                    float fx = enGrupo > 0 ? (float) sx / enGrupo / dw : 0, fy = enGrupo > 0 ? (float) sy / enGrupo / dh : 0;
                     aviso.aviso(cambiados <= maxImpacto() ? "impacto" : "cambio", fx, fy, cambiados, false);
                 }
                 System.arraycopy(cur, 0, ref, 0, n);

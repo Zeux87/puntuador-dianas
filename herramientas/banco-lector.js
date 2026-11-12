@@ -6,6 +6,9 @@
 //   node herramientas/banco-lector.js app/src/main/assets/index.html
 //   FONDO=40 node herramientas/banco-lector.js ...    gris de lo que se ve a través del agujero (0-255)
 //   SIN_PISTA=1 ...  sin la posición aproximada que manda el lector
+//   MALA=1 ...  el lector manda una posición equivocada (lejos del impacto)
+//   PIERDE=1 ... el lector no avisa de uno de cada tres impactos (deben aparecer con el siguiente)
+//   PERSP=0.5 ... cámara muy inclinada (por ejemplo colocada encima de la diana): la diana se ve achatada
 //   V=1 ...   muestra cada impacto
 const { chromium } = require('playwright');
 const file = process.argv[2], FONDO = +(process.env.FONDO || 150);
@@ -22,7 +25,7 @@ function makeCases(){
       const i = 3 + j * 3, b = shots[i - 1 - (j % 2)], a = r() * 2 * Math.PI, sep = 1.5 + r() * 2;
       shots[i] = [b[0] + Math.cos(a) * sep, b[1] + Math.sin(a) * sep];
     }
-    cases.push({ seed: k, shots, frac: [0.45, 0.6, 0.75][k % 3], persp: [0.95, 0.85, 0.75, 0.8][k % 4], rot: 0 * r(), noise: 6 + (k % 3) * 3, mueve: k % 2 === 1 });
+    cases.push({ seed: k, shots, frac: [0.45, 0.6, 0.75][k % 3], persp: +(process.env.PERSP || 0) || [0.95, 0.85, 0.75, 0.8][k % 4], rot: 0 * r(), noise: 6 + (k % 3) * 3, mueve: k % 2 === 1 });
   }
   return cases;
 }
@@ -33,7 +36,9 @@ function makeCases(){
   await pg.goto('file://' + require('path').resolve(file));
   await pg.waitForTimeout(400);
   if (process.env.SIN_PISTA) await pg.evaluate(() => { window.__sinPista = true; });
-  let T = { n: 0, ok: 0, dud: 0, nada: 0, err: 0, maxe: 0, dScore: 0 };
+  if (process.env.MALA) await pg.evaluate(() => { window.__mala = true; });
+  if (process.env.PIERDE) await pg.evaluate(() => { window.__pierde = true; });
+  let T = { n: 0, ok: 0, dud: 0, nada: 0, err: 0, maxe: 0, dScore: 0, mas: 0, rec: 0, perd: 0 };
   for (const c of makeCases()){
     const res = await pg.evaluate(async ({ c, FONDO }) => {
       function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -85,32 +90,45 @@ function makeCases(){
       Lec.on = true;
       lectorCargar(await frame(0, 0));
       await new Promise(res => { const chk = () => St.msg.includes('Buscando') ? setTimeout(chk, 5) : res(); chk(); });
-      const ini = St.shots.length, out = [];
+      const ini = St.shots.length, out = [], perdidos = [];
+      let mas = 0, rec = 0;
       for (let i = 0; i < c.shots.length; i++){
         const im = await frame(i + 1, 1);
+        // Aviso perdido: el lector no dice nada de este impacto (no pegado a otro) y sigue con el siguiente
+        if (window.__pierde && i % 3 === 1 && i < c.shots.length - 1 && c.shots.every((t, j) => j === i || Math.hypot(t[0] - c.shots[i][0], t[1] - c.shots[i][1]) > 14)){ perdidos.push(i); out.push('perdido'); continue; }
         const antes = St.shots.length;
-        lectorEvento(SIN_PISTA ? { tipo: 'impacto', x: 0, y: 0 } : { tipo: 'impacto', ...pista }, im);
+        const ev = SIN_PISTA ? { tipo: 'impacto', x: 0, y: 0 } : window.__mala ? { tipo: 'impacto', x: 0.5 + (i % 2 ? 0.2 : -0.2), y: i % 3 ? 0.12 : 0.88 } : { tipo: 'impacto', ...pista };
+        lectorEvento(ev, im);
         if (St.shots.length === antes){ out.push(null); continue; }
+        // Los añadidos de más deben ser impactos perdidos antes; cualquier otro es un fantasma
+        for (let q = antes; q < St.shots.length - 1; q++){
+          const inf = shotInfo(St.shots[q]);
+          const j = perdidos.findIndex(pi => Math.hypot(inf.mx - c.shots[pi][0], inf.my - c.shots[pi][1]) <= 1);
+          if (j >= 0){ perdidos.splice(j, 1); rec++; } else mas++;
+        }
         const sh = St.shots[St.shots.length - 1], inf = shotInfo(sh);
         out.push([inf.mx, inf.my, inf.dec, sh.dudoso ? 1 : 0]);
       }
       Lec.on = false;
-      return { ini, out, cal: !!St.cal };
+      return { ini, out, cal: !!St.cal, mas, rec, perd: perdidos.length + rec };
     }, { c, FONDO });
     let ok = 0, dud = 0, nada = 0, err = 0, maxe = 0, ds = 0;
+    let nAv = 0;
     res.out.forEach((o, i) => {
       const t = c.shots[i];
+      if (o === 'perdido') return;
+      nAv++;
       if (!o){ nada++; if (process.env.V) console.log(`   ${i + 1}: sin impacto (real ${t.map(v => v.toFixed(1))})`); return; }
       const e = Math.hypot(o[0] - t[0], o[1] - t[1]);
       const sc = Math.min(10.9, Math.floor((11 - Math.hypot(t[0], t[1]) / 8) * 10 + 1e-6) / 10);
       if (e <= 1) ok++; err += e; maxe = Math.max(maxe, e); ds += Math.abs(sc - o[2]); if (o[3]) dud++;
       if (process.env.V) console.log(`   ${i + 1}: error ${e.toFixed(2)} mm, ${o[2]} (real ${sc})${o[3] ? ' dudoso' : ''}`);
     });
-    const n = res.out.filter(Boolean).length;
-    T.n += 10; T.ok += ok; T.dud += dud; T.nada += nada; T.err += err; T.maxe = Math.max(T.maxe, maxe); T.dScore += ds;
-    console.log(`caso ${c.seed}: frac=${c.frac} persp=${c.persp} ${c.mueve ? 'papel se mueve' : ''} → de partida ${res.ini}, a <1 mm ${ok}/10, sin marcar ${nada}, dudosos ${dud}, error medio ${(n ? err / n : 0).toFixed(2)} mm, máx ${maxe.toFixed(2)} mm`);
+    const n = res.out.filter(o => o && o !== 'perdido').length;
+    T.n += nAv; T.mas += res.mas; T.rec += res.rec; T.perd += res.perd; T.ok += ok; T.dud += dud; T.nada += nada; T.err += err; T.maxe = Math.max(T.maxe, maxe); T.dScore += ds;
+    console.log(`caso ${c.seed}: frac=${c.frac} persp=${c.persp} ${c.mueve ? 'papel se mueve' : ''} → de partida ${res.ini}, a <1 mm ${ok}/${nAv}, sin marcar ${nada}, dudosos ${dud}, error medio ${(n ? err / n : 0).toFixed(2)} mm, máx ${maxe.toFixed(2)} mm`);
   }
   const n = T.n - T.nada;
-  console.log(`TOTAL (fondo ${FONDO}): a <1 mm ${T.ok}/${T.n}, sin marcar ${T.nada}, dudosos ${T.dud}, error medio ${(T.err / n).toFixed(3)} mm, máx ${T.maxe.toFixed(2)} mm, error de puntuación medio ${(T.dScore / n).toFixed(3)}`);
+  console.log(`TOTAL (fondo ${FONDO}): a <1 mm ${T.ok}/${T.n}, sin marcar ${T.nada}, dudosos ${T.dud}, error medio ${(T.err / n).toFixed(3)} mm, máx ${T.maxe.toFixed(2)} mm, error de puntuación medio ${(T.dScore / n).toFixed(3)}, fantasmas ${T.mas}, perdidos recuperados ${T.rec}/${T.perd}`);
   await b.close();
 })();

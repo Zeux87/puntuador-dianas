@@ -2638,33 +2638,49 @@ function lectorRebase(im){
 function lectorImpacto(o, im){
   const d = D(), P = prepare(im);
   if (P.w !== St.P.w || P.h !== St.P.h){ lectorCargar(im); return; }
-  // Posición aproximada que ha visto el lector (a 1/8 de resolución): acota la búsqueda
+  // Posición aproximada que ha visto el lector (a 1/8 de resolución): solo orienta la búsqueda
   const pista = o.x > 0 && o.y > 0 ? { x: o.x * P.w, y: o.y * P.h } : null;
-  let r = null;
-  try { r = lectorLocaliza(Lec.base, im, St.P, St.cal, d, pista); } catch (_) { r = null; }
+  const busca = p => { try { return lectorLocaliza(Lec.base, im, St.P, St.cal, d, p); } catch (_) { return null; } };
+  let r = busca(pista);
+  // La pista del lector puede caer lejos (el papel tiembla, cambia una sombra…): si junto a ella
+  // no hay un agujero claro, se busca en toda la diana y manda lo que se ve en la foto
+  if (pista && !(r && r.ok && r.conf >= 0.6)){
+    const r2 = busca(null);
+    if (r2 && r2.ok && (!r || !r.ok || (r2.conf >= 0.6 && r2.fill > r.fill * 1.5))) r = r2;
+    else if (r2 && r2.cand && (!r || !r.cand || (!r.ok && r2.fill > r.fill * 1.5))) r = r2;
+  }
+  const hmm = pista ? toMM(St.cal, d.negro, pista.x, pista.y) : null;
+  const dentro = hmm && Math.hypot(hmm.x, hmm.y) < outerR(d);
+  const hay = r && (r.ok || r.cand);
+  const movido = r && Math.hypot(r.dx, r.dy) * r.k >= 0.75;
   // Si el papel se ha movido un poco con el impacto, se mueven con él la calibración y los impactos
-  if (r && Math.hypot(r.dx, r.dy) * r.k >= 0.75){
+  if (movido){
     for (const k of ['cx', 'cx0']) if (St.cal[k] != null) St.cal[k] += r.dx;
     for (const k of ['cy', 'cy0']) if (St.cal[k] != null) St.cal[k] += r.dy;
     St.shots.forEach(sh => { sh.x += r.dx; sh.y += r.dy; });
   }
-  P.t0 = St.P.t0; St.P = P; St.src = im; St.hi = null; Lec.base = im;
-  if (!r || !r.ok){
-    // El lector ha visto algo pero en la foto no se distingue: se propone su posición aproximada
-    const hmm = pista ? toMM(St.cal, d.negro, pista.x, pista.y) : null;
-    const dentro = hmm && Math.hypot(hmm.x, hmm.y) < outerR(d) + 15;
-    if (r && r.cand) lectorAnadir(r.x, r.y, true);
-    else if (dentro) lectorAnadir(pista.x, pista.y, true);
-    else { St.msg = '<b>El lector ha notado un cambio, pero no encuentro un impacto nuevo.</b> Si has disparado, añádelo con «Añadir».'; update(); }
+  P.t0 = St.P.t0; St.P = P; St.src = im; St.hi = null;
+  // Si no se ha encontrado nada se sigue comparando con la foto anterior: un impacto que ahora
+  // no se distingue vuelve a tener otra oportunidad con el aviso siguiente
+  if (hay || dentro || movido) Lec.base = im;
+  if (r && r.ok){
+    // Impactos que el lector no avisó en su momento y aparecen ahora en la misma comparación
+    (r.otros || []).forEach(q => lectorAnadir(q.x, q.y, true, true));
+    lectorAnadir(r.x, r.y, r.conf < 0.6);
     return;
   }
-  lectorAnadir(r.x, r.y, r.conf < 0.6);
+  // El lector ha visto algo pero en la foto no se distingue: se propone la posición aproximada,
+  // siempre que caiga dentro de los anillos (fuera de ellos no puede ser un impacto que puntúe)
+  if (r && r.cand) lectorAnadir(r.x, r.y, true);
+  else if (dentro) lectorAnadir(pista.x, pista.y, true);
+  else { St.msg = '<b>El lector ha notado un cambio, pero no encuentro un impacto nuevo.</b> Si has disparado, añádelo con «Añadir».'; update(); }
 }
 
-function lectorAnadir(x, y, dudoso){
+function lectorAnadir(x, y, dudoso, callado){
   const sh = { x, y, id: St.nextId++, lector: true, orden: ++Lec.orden };
   if (dudoso) sh.dudoso = true;
   St.shots.push(sh); St.sel = -1;
+  if (callado){ if (St.det){ const j = shotInfo(sh); St.det.push([round2(j.mx), round2(j.my), 1]); } return; }
   const i = shotInfo(sh), n = St.shots.length, exp = expectedCount();
   if (St.det) St.det.push([round2(i.mx), round2(i.my), dudoso ? 1 : 0]);
   let m = `<b>Impacto ${n}: ${fmt1(i.dec)}</b>${i.x ? ' (X)' : ''} a las ${clockOf(i.mx, i.my)}. `;
@@ -2776,8 +2792,28 @@ function lectorLocaliza(A, B, P, cal, d, pista){
   }
   const fill = bd.fill, claro = segundo < bs * 0.6;
   const conf = Math.min(1, fill / 0.45) * (claro ? 1 : 0.5);
+  // Otros agujeros igual de claros y bien separados: impactos que el lector no avisó a tiempo
+  const otros = [];
+  if (fill >= 0.45){
+    const hechos = [[fx, fy]];
+    for (let n = 0; n < 4; n++){
+      let s2 = 0, ox = -1, oy = -1;
+      for (let y = M; y < H - M; y += 2) for (let x = M; x < W - M; x += 2){
+        if (hechos.some(h => Math.hypot(x - h[0], y - h[1]) < r * 3)) continue;
+        const v = box(x, y); if (v > s2){ s2 = v; ox = x; oy = y; }
+      }
+      if (ox < 0 || s2 < bs * 0.5) break;
+      let b2 = { sum: -1 }, qx = ox, qy = oy;
+      for (let yy = oy - span; yy <= oy + span; yy += 0.5) for (let xx = ox - span; xx <= ox + span; xx += 0.5){
+        const v = disc(xx, yy); if (v.sum > b2.sum){ b2 = v; qx = xx; qy = yy; }
+      }
+      hechos.push([qx, qy]);
+      if (b2.fill < 0.45 || b2.sum < bd.sum * 0.5) break;
+      otros.push({ x: x0 + (qx + 0.5) / k, y: y0 + (qy + 0.5) / k });
+    }
+  }
   return {
-    ok: fill >= 0.15, cand: fill >= 0.06, conf, fill, k,
+    ok: fill >= 0.15, cand: fill >= 0.06, conf, fill, k, otros,
     x: x0 + (fx + 0.5) / k, y: y0 + (fy + 0.5) / k, dx: -sx / k, dy: -sy / k
   };
 }
