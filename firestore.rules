@@ -1,0 +1,24 @@
+rules_version = '2';
+
+// Reglas de seguridad de Firestore del Puntuador de dianas.
+// Se publican a mano en la consola de Firebase → Firestore → Reglas.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Lista de cuentas que pueden usar la app: un documento por persona, con su correo como ID.
+    // Cada cuenta solo puede comprobar su propio documento; la lista no se puede leer entera
+    // ni cambiar desde la app (solo desde la consola).
+    match /permitidos/{correo} {
+      allow get: if request.auth != null
+                 && request.auth.token.email_verified == true
+                 && request.auth.token.email.lower() == correo;
+      allow list, write: if false;
+    }
+
+    // Ajustes generales. «acceso.abierto = true» abre la app a todos (salida de emergencia).
+    match /config/{doc} {
+      allow get: if true;
+      allow list, write: if false;
+    }
+  }
+}
