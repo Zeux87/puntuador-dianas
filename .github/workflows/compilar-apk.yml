@@ -9,6 +9,7 @@ on:
       - 'lectorapp/**'
       - '.github/workflows/compilar-lector.yml'
       - '.github/workflows/compilar-lector-app.yml'
+      - 'permitidos.txt'
   workflow_dispatch:
 
 permissions:
