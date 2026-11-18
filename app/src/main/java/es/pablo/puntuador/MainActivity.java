@@ -28,6 +28,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
@@ -74,6 +75,10 @@ public class MainActivity extends Activity {
     // Lector de impactos WiFi (ESP32 junto a la diana)
     private Lector lector;
 
+    // Inicio de sesión con Google y lista de cuentas permitidas
+    private Acceso acceso;
+    private boolean paginaCargada = false;
+
     // Datos de la última versión encontrada en GitHub
     private volatile String urlApk = null;
     private volatile String versionNueva = null;
@@ -82,7 +87,9 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle estado) {
         super.onCreate(estado);
         web = new WebView(this);
-        setContentView(web);
+        FrameLayout raiz = new FrameLayout(this);
+        raiz.addView(web, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        setContentView(raiz);
 
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
@@ -158,7 +165,14 @@ public class MainActivity extends Activity {
         });
 
         aplicarTema("sistema");
-        web.loadUrl("file:///android_asset/index.html");
+
+        // La app solo se carga cuando la cuenta tiene acceso
+        acceso = new Acceso(this, () -> {
+            if (paginaCargada) return;
+            paginaCargada = true;
+            web.loadUrl("file:///android_asset/index.html");
+        });
+        acceso.empezar(raiz);
     }
 
     @Override
@@ -290,7 +304,7 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (web == null) {
+        if (web == null || !paginaCargada || !acceso.dejaVerLaApp()) {
             super.onBackPressed();
             return;
         }
@@ -711,6 +725,20 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void installUpdate() {
             instalarActualizacion();
+        }
+
+        @JavascriptInterface
+        public String accountEmail() {
+            return acceso.correo();
+        }
+
+        @JavascriptInterface
+        public void signOut() {
+            runOnUiThread(() -> {
+                if (lector != null) lector.desconectar();
+                pantallaEncendida(false);
+                acceso.cerrarSesion();
+            });
         }
 
         @JavascriptInterface

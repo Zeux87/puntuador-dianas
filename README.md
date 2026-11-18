@@ -22,11 +22,22 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 - Funciona sin conexión.
 - **Lector WiFi (opcional)**: una cámara ESP32 o un móvil viejo con la app Lector junto a la diana marca cada impacto al momento y en orden, sin hacer fotos. Montaje, firmware y app en [`lector/`](lector/README.md).
 
+## Acceso con cuenta de Google
+
+Para usar la app hay que entrar con una cuenta de Google que esté en la lista de [`permitidos.txt`](permitidos.txt). La lista se lee de este repositorio, así que se cambia sin compilar.
+
+- **Dar acceso a alguien:** instala la app y pulsa «Entrar con Google». Si no tiene permiso, la app le enseña un código de 16 caracteres. Añade ese código en una línea nueva de `permitidos.txt`. Así su correo no queda a la vista, porque el repositorio es público.
+- **Quitar el acceso:** borra su línea. La app lo comprueba cada vez que se abre.
+- **Si el inicio de sesión fallara:** añade una línea con `*` y la app se abre para todos sin pedir cuenta.
+- Mientras el proyecto de Google Cloud esté en modo «Prueba», cada persona tiene que estar también en **Google Auth Platform → Público → Usuarios de prueba**, o Google no le dejará entrar.
+- Sin conexión, quien ya tenía acceso sigue entrando.
+
 ## Estructura
 
 - `app/src/main/assets/index.html`: toda la lógica de detección y la interfaz.
 - `app/src/main/java/es/pablo/puntuador/MainActivity.java`: la ventana Android que muestra la página y abre la cámara o la galería.
 - `.github/workflows/compilar-apk.yml`: compila y publica el APK.
+- `app/src/main/java/es/pablo/puntuador/Acceso.java`: inicio de sesión con Google y comprobación de la lista de `permitidos.txt`.
 - `app/src/main/java/es/pablo/puntuador/Lector.java`: conexión con el lector WiFi (se une a su red y descarga cada aviso con su foto).
 - `lectorapp/`: app «Lector de dianas» para usar un móvil viejo como lector (misma API que el ESP32). `.github/workflows/compilar-lector-app.yml` la publica en la versión «lector».
 - `lector/lector.ino`: firmware del lector (ESP32 con cámara). `.github/workflows/compilar-lector.yml` lo compila y publica en la versión «lector».

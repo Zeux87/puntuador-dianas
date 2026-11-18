@@ -634,6 +634,14 @@ html.camopen,html.camopen body{overflow:hidden}
       <p class="dmeta" style="margin:0">Al restaurar se añaden las sesiones de la copia. Las que ya tengas se conservan; si una está en los dos sitios, se queda la de la copia.</p>
     </div>
 
+    <div id="accBox" class="card" hidden>
+      <h2>Cuenta</h2>
+      <p class="dmeta" style="margin:0" id="accEmail"></p>
+      <div class="row">
+        <button id="accOut" class="btn" type="button">Cerrar sesión</button>
+      </div>
+    </div>
+
     <div id="appBox" class="card">
       <h2>Aplicación</h2>
       <div class="appinfo">
@@ -3639,6 +3647,14 @@ function renderSettings(){
   $('bkButtons').hidden = !nativo;
   $('bkWeb').hidden = nativo;
   $('bkExport').disabled = !ix.length;
+  // Cuenta de Google con la que se ha entrado (solo en la app Android)
+  const App = window.AndroidApp;
+  if (App && App.accountEmail){
+    let c = '';
+    try { c = App.accountEmail() || ''; } catch (_) {}
+    $('accBox').hidden = false;
+    $('accEmail').textContent = c ? `Has entrado como ${c}.` : 'Has entrado sin cuenta porque la app está abierta a todos.';
+  }
 }
 
 function initSettings(){
@@ -3651,6 +3667,17 @@ function initSettings(){
   document.querySelectorAll('#cfgTema [data-v]').forEach(b => b.addEventListener('click', () => {
     Cfg.tema = b.dataset.v; saveCfg(); applyTheme(); renderSettings();
   }));
+  $('accOut').addEventListener('click', () => {
+    const b = $('accOut');
+    // Doble toque para confirmar, como «A cero»
+    if (b.dataset.ok !== '1'){
+      b.dataset.ok = '1'; b.textContent = '¿Seguro? Toca otra vez';
+      setTimeout(() => { b.dataset.ok = ''; b.textContent = 'Cerrar sesión'; }, 3500);
+      return;
+    }
+    b.dataset.ok = ''; b.textContent = 'Cerrar sesión';
+    try { window.AndroidApp.signOut(); } catch (_) {}
+  });
   const bkMsg = t => { $('bkMsg').textContent = t; };
   $('bkExport').addEventListener('click', () => { bkMsg('Elige dónde guardar la copia…'); window.AndroidApp.exportBackup(); });
   $('bkImport').addEventListener('click', () => { bkMsg('Elige el archivo de la copia…'); window.AndroidApp.importBackup(); });
