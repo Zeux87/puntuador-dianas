@@ -1,17 +1,6 @@
-# Cuentas de Google que pueden usar el Puntuador de dianas
-#
-# Una línea por persona. Lo normal es poner el CÓDIGO que le sale en la app
-# cuando intenta entrar sin permiso (así su correo no queda a la vista,
-# porque este repositorio es público). Detrás de la almohadilla puedes
-# poner un nombre para acordarte de quién es.
-#
-# También vale poner el correo tal cual, pero quedará visible para cualquiera.
-#
-# Para quitar el acceso a alguien, borra su línea. Para abrir la app a todo
-# el mundo (por ejemplo, si el inicio de sesión fallase), añade una línea
-# con solo un asterisco: *
-#
-# Los cambios tardan unos minutos en llegar a la app.
+# Este archivo ya no se usa desde la versión con Firebase.
+# La lista de cuentas permitidas está ahora en Firestore (colección «permitidos»).
+# Lo dejamos un tiempo para las copias de la app 1.0.20 que aún no se hayan actualizado.
 
 fad68d49baf758a6  # Pablo
 3301a4a3f383aade  # primer tester

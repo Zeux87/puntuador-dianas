@@ -24,11 +24,12 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 
 ## Acceso con cuenta de Google
 
-Para usar la app hay que entrar con una cuenta de Google que esté en la lista de [`permitidos.txt`](permitidos.txt). La lista se lee de este repositorio, así que se cambia sin compilar.
+Para usar la app hay que entrar con una cuenta de Google que tenga permiso. El inicio de sesión y la lista de permitidos están en Firebase (proyecto «Puntuador dianas»), en el plan gratuito.
 
-- **Dar acceso a alguien:** instala la app y pulsa «Entrar con Google». Si no tiene permiso, la app le enseña un código de 16 caracteres. Añade ese código en una línea nueva de `permitidos.txt`. Así su correo no queda a la vista, porque el repositorio es público.
-- **Quitar el acceso:** borra su línea. La app lo comprueba cada vez que se abre.
-- **Si el inicio de sesión fallara:** añade una línea con `*` y la app se abre para todos sin pedir cuenta.
+- **Dar acceso a alguien:** en la consola de Firebase → Firestore → colección `permitidos`, añade un documento cuyo **ID sea su correo en minúsculas** (por ejemplo `nombre@gmail.com`). Los campos dan igual; puedes poner `nombre` para acordarte de quién es.
+- **Quitar el acceso:** borra su documento. La app lo comprueba cada vez que se abre.
+- **Si el inicio de sesión fallara:** en la colección `config`, documento `acceso`, pon el campo `abierto` (booleano) a `true` y la app se abre para todos sin pedir cuenta. Vuelve a ponerlo a `false` para cerrarla.
+- La lista es privada: las reglas de seguridad de Firestore (en [`firestore.rules`](firestore.rules)) solo dejan a cada cuenta comprobar su propio documento, y nadie puede cambiarla desde la app.
 - Mientras el proyecto de Google Cloud esté en modo «Prueba», cada persona tiene que estar también en **Google Auth Platform → Público → Usuarios de prueba**, o Google no le dejará entrar.
 - Sin conexión, quien ya tenía acceso sigue entrando.
 
@@ -37,7 +38,7 @@ Para usar la app hay que entrar con una cuenta de Google que esté en la lista d
 - `app/src/main/assets/index.html`: toda la lógica de detección y la interfaz.
 - `app/src/main/java/es/pablo/puntuador/MainActivity.java`: la ventana Android que muestra la página y abre la cámara o la galería.
 - `.github/workflows/compilar-apk.yml`: compila y publica el APK.
-- `app/src/main/java/es/pablo/puntuador/Acceso.java`: inicio de sesión con Google y comprobación de la lista de `permitidos.txt`.
+- `app/src/main/java/es/pablo/puntuador/Acceso.java`: inicio de sesión con Google (Firebase) y comprobación de la lista de permitidos en Firestore.
 - `app/src/main/java/es/pablo/puntuador/Lector.java`: conexión con el lector WiFi (se une a su red y descarga cada aviso con su foto).
 - `lectorapp/`: app «Lector de dianas» para usar un móvil viejo como lector (misma API que el ESP32). `.github/workflows/compilar-lector-app.yml` la publica en la versión «lector».
 - `lector/lector.ino`: firmware del lector (ESP32 con cámara). `.github/workflows/compilar-lector.yml` lo compila y publica en la versión «lector».
